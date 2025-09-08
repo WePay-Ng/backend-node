@@ -5,12 +5,17 @@
   "main": "index.js",
   "author": "",
   "license": "ISC",
+  "type": "module",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "prisma:migrate": "prisma migrate dev",
+    "prod": "yarn prisma:prod && node dist/server.js",
+    "lint": "eslint --ext .js,.ts --ignore-pattern .gitignore .",
     "prisma:generate": "prisma generate",
+    "prisma:init": "prisma migrate reset",
+    "prisma:update": "prisma migrate dev",
+    "prisma:prod": "prisma migrate deploy",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
@@ -20,10 +25,10 @@
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "express": "^5.1.0",
-    "helmet": "^8.1.0",
-    "morgan": "^1.10.1"
+    "helmet": "^8.1.0"
   },
   "devDependencies": {
+    "typescript-eslint": "^8.42.0",
     "@types/express": "^5.0.3",
     "@types/node": "^24.3.1",
     "@typescript-eslint/eslint-plugin": "^8.42.0",

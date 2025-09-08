@@ -15,6 +15,7 @@ export const createApp = () => {
   app.use(express.json());
   app.use(morgan('combined'));
 
+  app.get('/', (_, res) => res.json({ ok: true }));
   app.get('/health', (_, res) => res.json({ ok: true }));
 
   // register routes
