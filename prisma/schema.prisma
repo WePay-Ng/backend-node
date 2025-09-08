@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -14,11 +8,137 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  email               String               @unique
+  password            String               @db.VarChar(60)
+  name                String?
+  gender              Gender               @default(Male)
+  dob                 DateTime?            @db.Date
+  phone               String?              @unique @db.VarChar(20)
+  occupation          String?              @db.VarChar(30)
+  education           String?              @db.VarChar(30)
+  religion            String?              @db.VarChar(30)
+  maritalStatus       String?              @db.VarChar(20)
+  pin                 String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @default(now()) @updatedAt @db.Timestamp(6)
+  role                UserRole             @default(USER)
+  agent               Agent?               @relation("UserAgent")
+  addressId           String?              @db.Char(36)
+  address             Address?             @relation("AddressUser", fields: [addressId], references: [id])
+  verificationIntents VerificationIntent[] @relation("UserVerificationIntent")
+}
+
+model Agent {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  userId         String       @unique
+  category       String
+  user           User         @relation("UserAgent", fields: [userId], references: [id])
+  contactPhone   String?      @unique @db.VarChar(20)
+  contactEmail   String
+  nationality    String       @db.VarChar(100)
+  nextOfKin      String?
+  businessName   String
+  licenseNumber  String
+  address        String
+  verificationId String       @db.Char(36)
+  verification   Verification @relation("VerificationAgent", fields: [verificationId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt @db.Timestamp(6)
+}
+
+model Address {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  streetLine     String
+  city           String
+  state          String
+  country        String     @db.VarChar(100)
+  office_address String?
+  landmark       String?
+  homeAddress    String?
+  lga            String?
+  updatedAt      DateTime   @default(now()) @updatedAt @db.Timestamp(6)
+  createdAt      DateTime   @default(now())
+  users          User[]     @relation("AddressUser")
+  businesses     Business[] @relation("AddressBusiness")
+}
+
+model Business {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  type           String
+  name           String
+  verified       Boolean       @default(false)
+  startedAt      DateTime?     @db.Date
+  operationDays  String?
+  operatingHours String?
+  verificationId String?       @db.Char(36)
+  bankId         String?       @db.Char(36)
+  bank           Bank?         @relation("BankBusiness", fields: [bankId], references: [id])
+  verification   Verification? @relation("VerificationBusiness", fields: [verificationId], references: [id])
+  addressId      String?       @db.Char(36)
+  address        Address?      @relation("AddressBusiness", fields: [addressId], references: [id])
+}
+
+model Verification {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  bvn             Int
+  IDType          String     @db.VarChar(2048)
+  cac             String?
+  MEMART          String?
+  authorityLetter String?
+  tin             String?
+  IDFront         String?    @db.VarChar(2048)
+  IDBack          String?    @db.VarChar(2048)
+  passport        String?    @db.VarChar(2048)
+  utility         String?    @db.VarChar(2048)
+  biometric       Boolean    @default(false)
+  agents          Agent[]    @relation("VerificationAgent")
+  businesses      Business[] @relation("VerificationBusiness")
+}
+
+model Bank {
+  id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  name          String
+  accountName   String
+  accountNumber Int
+  type          String
+  businesses    Business[] @relation("BankBusiness")
+}
+
 model IdempotencyKey {
   key          String    @id
   requestHash  String
   responseBody Json?
   statusCode   Int?
   lockedAt     DateTime?
+  updatedAt    DateTime  @default(now()) @updatedAt @db.Timestamp(6)
   createdAt    DateTime  @default(now())
+}
+
+model VerificationIntent {
+  id          String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  user        User                   @relation("UserVerificationIntent", fields: [userId], references: [id])
+  userId      String                 @db.Char(36)
+  type        VerificationIntentType
+  refreshCode String                 @db.VarChar(100)
+  expiresAt   DateTime               @default(dbgenerated("NOW() + interval '60 minutes'")) @db.Timestamp(6)
+  createdAt   DateTime               @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime               @default(now()) @updatedAt @db.Timestamp(6)
+}
+
+enum VerificationIntentType {
+  EMAIL
+  PHONE
+}
+
+enum Gender {
+  Male
+  Female
+}
+
+enum UserRole {
+  USER
+  AGENT
+  ADMIN
 }
