@@ -1,0 +1,18 @@
+// import Cloudflare from './cloudflare';
+// import GCP from './GCP';
+
+import { Cloudflare } from './cloudflare';
+import { GCP } from './GCP';
+
+export const uploadImage = async (
+  file: any,
+  { prefix, platform = 'cloudflare' }: { prefix?: string; platform?: string },
+) => {
+  if (platform.includes('cloudflare')) {
+    return Cloudflare.uploadToR2(file, prefix);
+  }
+
+  if (platform.includes('GCP')) {
+    return await GCP.upload(file);
+  }
+};

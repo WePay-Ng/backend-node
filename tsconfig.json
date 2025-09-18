@@ -1,18 +1,27 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "CommonJS",
+    "target": "esnext",
+    "module": "esnext",
     "moduleResolution": "node",
-    "lib": ["ES2020"],
-    "outDir": "dist",
-    "rootDir": "src",
     "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
+    "useUnknownInCatchVariables": false,
     "resolveJsonModule": true,
-    "types": ["node", "express"]
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "lib": ["esnext"],
+    "esModuleInterop": true,
+    "baseUrl": "./",
+    "paths": {
+      "@": ["src/"],
+      "@/*": ["src/*"],
+      "@modules": ["src/modules"],
+      "@modules/*": ["src/modules/*"],
+      "@utils": ["src/utils"],
+      "@utils/*": ["src/utils/*"],
+      // "@types": ["src/types"],
+      "@prisma-config/*": ["prisma/*"]
+    }
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src", "src/types"],
+  "exclude": ["node_modules"]
 }

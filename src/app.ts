@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
 import { errorHandler } from './middleware/errorHandler';
-// import authRoutes from './modules/auth/auth.routes';
+import authRoutes from './modules/auth/auth.routes';
 // import paymentRoutes from './modules/payments/payment.routes';
 
 export const createApp = () => {
@@ -19,7 +19,7 @@ export const createApp = () => {
   app.get('/health', (_, res) => res.json({ ok: true }));
 
   // register routes
-  //   app.use('/v1/auth', authRoutes);
+  app.use('/v1/auth', authRoutes);
   //   app.use('/v1/payments', paymentRoutes);
 
   app.use(errorHandler);
