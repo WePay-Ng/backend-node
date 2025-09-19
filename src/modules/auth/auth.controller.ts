@@ -1,6 +1,7 @@
 // src/modules/auth/auth.controller.ts
 import { Request, Response } from 'express';
 import * as authService from './auth.service';
+import { prisma } from '../../prisma/client';
 import {
   ValidateAddress,
   ValidateBank,
@@ -11,7 +12,6 @@ import {
   ValidateUpdateUser,
   ValidateVerification,
 } from './validator';
-import { prisma } from '../../prisma/client';
 
 export class AuthController {
   static async register(req: Request, res: Response) {
@@ -25,6 +25,7 @@ export class AuthController {
       return res.status(400).json({ error: error.message });
     }
   }
+
   static async updateUser(req: Request, res: Response) {
     try {
       let user = req?.user;

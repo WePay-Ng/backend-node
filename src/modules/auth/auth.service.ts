@@ -12,7 +12,10 @@ import {
   Register,
   ResetPassword,
 } from '../../types/types';
+import otpGenerator from 'otp-generator';
 import { uploadImage } from '../../utils/fileUploader';
+import sendEmail from '@/extensions/mail-service/send-email';
+import { User } from '@prisma/client';
 
 export async function register(data: Register) {
   // hash bvn
@@ -43,6 +46,7 @@ export async function register(data: Register) {
   });
 
   // TODO: Send OTP here
+  sendOTP(user);
 
   prisma.auditLog.create({
     data: { userId: user.id, action: 'REGISTER', ip: null },
@@ -282,4 +286,33 @@ export async function logout(refreshTokenRaw?: string, ip?: string) {
   const hash = hashToken(refreshTokenRaw);
   await prisma.refreshToken.deleteMany({ where: { tokenHash: hash } });
   // audit log optional
+}
+
+async function sendOTP(user: User) {
+  const code = otpGenerator.generate(6, {
+    lowerCaseAlphabets: false,
+    upperCaseAlphabets: false,
+    specialChars: false,
+  });
+
+  const verification = await prisma.verificationIntent.create({
+    data: {
+      refreshCode: code,
+      userId: user.id,
+      type: 'EMAIL',
+    },
+  });
+
+  if (!verification) throw new Error('OTP not saved');
+
+  await sendEmail({
+    to: user.email,
+    variables: {
+      code: code,
+      email: user.email,
+      to_name: user.name,
+      // BASE_URL: data?.BASE_URL,
+    },
+    template: 'verification',
+  });
 }

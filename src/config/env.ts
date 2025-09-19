@@ -25,6 +25,14 @@ export interface Environment {
     url: string;
   };
 
+  mail: {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    sender: string;
+  } | null;
+
   google: {
     projectId: string;
     clientEmail: string;
@@ -75,7 +83,13 @@ export const environment: Environment = {
     refreshSecret: process.env.JWT_REFRESH_SECRET as string,
     saltRounds: Number(process.env.AUTH_SALT_ROUNDS) || 10,
   },
-
+  mail: {
+    host: process.env.MAIL_HOST as string,
+    port: Number(process.env.MAIL_PORT) || 2525,
+    username: process.env.MAIL_USERNAME as string,
+    password: process.env.MAIL_PASSWORD as string,
+    sender: process.env.MAIL_SENDER as string,
+  },
   google: {
     projectId: process.env.GCP_PROJECT_ID!,
     clientEmail: process.env.GCP_CLIENT_EMAIL!,

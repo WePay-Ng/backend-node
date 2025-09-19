@@ -18,7 +18,7 @@
       "@modules/*": ["src/modules/*"],
       "@utils": ["src/utils"],
       "@utils/*": ["src/utils/*"],
-      // "@types": ["src/types"],
+      "@types": ["src/types"],
       "@prisma-config/*": ["prisma/*"]
     }
   },

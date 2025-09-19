@@ -2,59 +2,20 @@ import Joi from 'joi';
 
 export function ValidateRegister() {
   return Joi.object({
-    bvn: Joi.number().required(),
+    bvn: Joi.string()
+      .pattern(/^\d+$/) // only digits
+      .length(11)
+      .required(),
     email: Joi.string().email().optional(),
     role: Joi.string().valid('USER', 'AGENT', 'ADMIN').optional(),
-    // phone: Joi.string()
-    //   .pattern(/^[0-9]{10,15}$/)
-    //   .required(),
-    // password: Joi.string().min(8).required(),
-    // role: Joi.string().valid('USER', 'AGENT', 'ADMIN').required(), // differentiate
-    // occupation: Joi.string().optional(),
-    // education: Joi.string().optional(),
-    // religion: Joi.string().optional(),
-    // maritalStatus: Joi.string().optional(),
-    // address: Joi.object({
-    //   country: Joi.string().required(),
-    //   state: Joi.string().required(),
-    //   city: Joi.string().required(),
-    //   streetline: Joi.string().required(),
-    //   office_address: Joi.string().optional(),
-    //   landmark: Joi.string().optional(),
-    // }),
-    // business: Joi.object({
-    //   type: Joi.string().required(),
-    //   name: Joi.string().required(),
-    //   operationDays: Joi.string().optional(),
-    //   operatingHours: Joi.string().optional(),
-    //   startedAt: Joi.date().optional(),
-    //   address: Joi.object({
-    //     country: Joi.string().required(),
-    //     state: Joi.string().required(),
-    //     streetline: Joi.string().required(),
-    //     landmark: Joi.string().optional(),
-    //   }),
-    // }),
-    // verification: Joi.object({
-    //   bvn: Joi.number().required(),
-    //   type: Joi.string().required(),
-    //   IDFront: Joi.string().optional(),
-    //   IDBack: Joi.string().optional(),
-    //   passport: Joi.string().optional(),
-    //   utility: Joi.string().optional(),
-    // }),
-    // bank: Joi.object({
-    //   bank: Joi.string().required(),
-    //   accountName: Joi.string().required(),
-    //   accountNumber: Joi.string().required(),
-    //   type: Joi.string().required(),
-    // }),
   });
 }
 
 export function ValidateUpdateUser() {
   return Joi.object({
-    bvn: Joi.number().required(),
+    bvn: Joi.string()
+      .pattern(/^\d+$/) // only digits
+      .length(11),
     email: Joi.string().email().optional(),
     role: Joi.string().valid('USER', 'AGENT', 'ADMIN').optional(),
     phone: Joi.string()
@@ -130,7 +91,9 @@ export function ValidatePassword() {
 
 export function ValidateBVN() {
   return Joi.object({
-    bnv: Joi.number().min(11).required(),
+    bnv: Joi.string()
+      .pattern(/^\d+$/) // only digits
+      .length(11),
   });
 }
 
@@ -153,7 +116,9 @@ export function ValidateBank() {
 
 export function ValidateVerification() {
   return Joi.object({
-    bvn: Joi.number().required(),
+    bvn: Joi.string()
+      .pattern(/^\d+$/) // only digits
+      .length(11),
     type: Joi.string().required(),
     IDFront: Joi.string().optional(),
     IDBack: Joi.string().optional(),

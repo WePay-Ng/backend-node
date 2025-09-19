@@ -5,22 +5,21 @@ import cors from 'cors';
 import morgan from 'morgan';
 import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './modules/auth/auth.routes';
-// import paymentRoutes from './modules/payments/payment.routes';
+
+const app = express();
+
+app.use(helmet());
+app.use(cors({ origin: false })); // tighten later
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(morgan('combined'));
 
 export const createApp = () => {
-  const app = express();
-
-  app.use(helmet());
-  app.use(cors({ origin: false })); // tighten later
-  app.use(express.json());
-  app.use(morgan('combined'));
-
   app.get('/', (_, res) => res.json({ ok: true }));
   app.get('/health', (_, res) => res.json({ ok: true }));
 
   // register routes
-  app.use('/v1/auth', authRoutes);
-  //   app.use('/v1/payments', paymentRoutes);
+  app.use('/api/v1/auth', authRoutes);
 
   app.use(errorHandler);
 
