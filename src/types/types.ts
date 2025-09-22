@@ -1,4 +1,4 @@
-export type Role = 'USER' | 'AGENT' | 'ADMIN' | 'MERCHANT' | 'INSTITUTION';
+export type Role = 'USER' | 'AGENT' | 'MERCHANT' | 'INSTITUTION';
 export type Register = {
   email: string;
   bvn: string;
@@ -20,6 +20,7 @@ export type Business = {
   contactPhone?: string;
   startedAt?: Date;
   address?: Address;
+  bank?: Bank;
 };
 
 export type ResetPassword = {
@@ -30,7 +31,6 @@ export type ResetPassword = {
 };
 
 export type Bank = {
-  bank: string;
   accountName: string;
   accountNumber: number | string;
   type: string;
@@ -38,9 +38,9 @@ export type Bank = {
 };
 
 export type Address = {
-  country: string;
-  state: string;
-  city: string;
+  country?: string;
+  state?: string;
+  city?: string;
   streetLine: string;
   office_address?: string;
   landmark?: string;

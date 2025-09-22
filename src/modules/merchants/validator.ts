@@ -1,43 +1,25 @@
 import Joi from 'joi';
 
-export function ValidateUpdateMerchant() {
-  return Joi.object({
-    type: Joi.string().required(),
-    name: Joi.string().required(),
-    operationDays: Joi.string().optional(),
-    operatingHours: Joi.string().optional(),
-    startedAt: Joi.date().optional(),
-    address: Joi.object({
-      country: Joi.string().required(),
-      state: Joi.string().required(),
-      streetline: Joi.string().required(),
-      landmark: Joi.string().optional(),
-    }),
-    verification: Joi.object({
-      type: Joi.optional(),
-      IDFront: Joi.optional(),
-      IDBack: Joi.optional(),
-      passport: Joi.optional(),
-      utility: Joi.optional(),
-      cac: Joi.optional(),
-    }),
-  });
-}
-
 export function ValidateBusiness() {
   return Joi.object({
-    type: Joi.string().required(),
     category: Joi.string().required(),
     name: Joi.string().required(),
-    operationDays: Joi.string().optional(),
-    operatingHours: Joi.string().optional(),
+    contactEmail: Joi.string().optional(),
+    contactPhone: Joi.string().optional(),
     startedAt: Joi.date().optional(),
     address: Joi.object({
-      country: Joi.string().required(),
-      state: Joi.string().required(),
-      streetline: Joi.string().required(),
+      country: Joi.string().optional(),
+      city: Joi.string().optional(),
+      state: Joi.string().optional(),
+      streetLine: Joi.string().required(),
       landmark: Joi.string().optional(),
     }),
+    bank: Joi.object({
+      name: Joi.string().required(),
+      accountName: Joi.string().required(),
+      accountNumber: Joi.string().required(),
+      type: Joi.string().required(),
+    }).optional(),
   });
 }
 

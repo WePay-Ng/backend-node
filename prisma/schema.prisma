@@ -83,9 +83,9 @@ model NextOfKin {
 model Address {
   id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
   streetLine     String
-  city           String
-  state          String
-  country        String     @db.VarChar(100)
+  city           String?
+  state          String?
+  country        String?    @db.VarChar(100)
   office_address String?
   landmark       String?
   homeAddress    String?
@@ -100,7 +100,7 @@ model Business {
   id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
   category      String
   name          String
-  merchantId    String         @unique @db.VarChar(36)
+  merchantId    String         @db.VarChar(36)
   merchant      Merchant       @relation("BusinessMerchant", fields: [merchantId], references: [id])
   contactPhone  String?
   contactEmail  String?

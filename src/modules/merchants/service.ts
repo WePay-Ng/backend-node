@@ -15,6 +15,17 @@ export async function createBusiness(id: string, payload: Business) {
     data.addressId = a.id;
   }
 
+  if (payload.bank) {
+    data.banks = {
+      create: {
+        accountName: payload?.bank?.accountName!,
+        accountNumber: Number(payload?.bank?.accountNumber!),
+        name: payload?.bank?.name!,
+        type: payload?.bank?.type!,
+      },
+    };
+  }
+
   const business = await prisma.business.create({
     data: {
       category: payload.category,

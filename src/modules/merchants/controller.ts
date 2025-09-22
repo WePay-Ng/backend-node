@@ -14,7 +14,7 @@ export class Controller {
       const { error, value } = ValidateBusiness().validate(req.body);
       if (error) throw new CustomError(error.details[0].message, 422);
 
-      const business = Merchant.createBusiness(id, value);
+      const business = await Merchant.createBusiness(id, value);
 
       return res.status(201).json({
         message: 'Business created successfully',
@@ -35,7 +35,7 @@ export class Controller {
       const { error, value } = ValidateVerification().validate(req.body);
       if (error) throw new CustomError(error.details[0].message, 422);
 
-      const verification = Merchant.addVerification(id, value);
+      const verification = await Merchant.addVerification(id, value);
 
       return res.status(201).json({
         message: 'Verification added successfully',
