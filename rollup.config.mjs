@@ -30,8 +30,39 @@ export default {
   input: 'src/server.ts',
   output: {
     dir: 'dist',
-    format: 'esm',
+    format: 'es', // Changed to ES modules
     sourcemap: !dev ? false : 'inline',
+  },
+  external: (id) => {
+    // Don't bundle built-in Node.js modules
+    if (
+      id.startsWith('node:') ||
+      [
+        'fs',
+        'path',
+        'crypto',
+        'http',
+        'https',
+        'url',
+        'util',
+        'stream',
+        'events',
+        'buffer',
+        'os',
+        'child_process',
+      ].includes(id)
+    ) {
+      return true;
+    }
+
+    // Bundle problematic CommonJS modules that don't play well with ESM
+    const bundledModules = ['debug', 'nanoid', 'otp-generator'];
+    if (bundledModules.some((mod) => id === mod || id.startsWith(mod + '/'))) {
+      return false; // Bundle these
+    }
+
+    // Keep other node_modules as external
+    return /node_modules/.test(id);
   },
   onwarn(warning, warn) {
     // suppress eval warnings
@@ -39,22 +70,33 @@ export default {
     // warn(warning)
   },
   plugins: [
-    peerDepsExternal({ includeDependencies: true }),
+    resolve({
+      preferBuiltins: true,
+      exportConditions: ['node'],
+      browser: false,
+    }),
     commonjs({
       ignoreDynamicRequires: true,
+      requireReturnsDefault: 'auto',
+      // Help with ESM to CommonJS conversion
+      transformMixedEsModules: true,
+      // Specify which modules need special handling
+      namedExports: {
+        debug: ['debug'],
+        'otp-generator': ['generate'],
+      },
     }),
     typescript({
       rollupCommonJSResolveHack: true,
       exclude: ['*.d.ts', '**/*.d.ts', '**/__tests__/**'],
       clean: true,
-      check: !dev, //? true : false,
-      // abortOnError: dev ? false : false,
+      tsconfig: './tsconfig.json',
+      check: !dev,
     }),
     dev && run({ execArgv: ['-r', 'dotenv/config'] }),
     !dev && terser(),
     alias({
       entries: [
-        // { find: '@extensions', replacement: r(ROOT, 'src/extensions') },
         { find: '@helpers', replacement: r(ROOT, 'src/helpers') },
         { find: '@modules', replacement: r(ROOT, 'src/modules') },
         { find: '@types', replacement: r(ROOT, 'src/types') },
@@ -64,6 +106,5 @@ export default {
       }),
     }),
     json(),
-    resolve(),
   ],
 };

@@ -48,6 +48,12 @@ export interface Environment {
     clientSecret: string;
     callbackURL: string;
   };
+  cloudflare: {
+    url: string;
+    bucket: string;
+    key: string;
+    secret: string;
+  };
 }
 
 const context =
@@ -104,5 +110,12 @@ export const environment: Environment = {
     clientId: process.env.GOOGLE_CLIENT_ID!,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     callbackURL: process.env.GOOGLE_CALLBACK!,
+  },
+
+  cloudflare: {
+    bucket: process.env.CLOUDFLARE_BUCKET_NAME as string,
+    key: process.env.CLOUDFLARE_ACCESS_KEY_ID as string,
+    secret: process.env.CLOUDFLARE_SECRET_ACCESS_KEY as string,
+    url: process.env.CLOUDFLARE_BUCKET_URL as string,
   },
 };

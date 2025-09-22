@@ -16,6 +16,7 @@ model User {
   gender                 Gender               @default(Male)
   dob                    DateTime?            @db.Date
   phone                  String?              @unique @db.VarChar(20)
+  emailVerified          Boolean              @default(false)
   occupation             String?              @db.VarChar(30)
   education              String?              @db.VarChar(30)
   religion               String?              @db.VarChar(30)
@@ -26,8 +27,6 @@ model User {
   lockUntil              DateTime?
   passwordResetTokenHash String?
   passwordResetExpires   DateTime?
-  activeBusinessId       String?              @db.Char(36)
-  business               Business?            @relation("UserActiveBusiness", fields: [activeBusinessId], references: [id])
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @default(now()) @updatedAt @db.Timestamp(6)
   role                   UserRole             @default(USER)
@@ -35,37 +34,50 @@ model User {
   addressId              String?              @db.Char(36)
   address                Address?             @relation("AddressUser", fields: [addressId], references: [id])
   verificationIntents    VerificationIntent[] @relation("UserVerificationIntent")
-  businesses             Business[]           @relation("UserBusiness")
   auditLogs              AuditLog[]           @relation("UserLogs")
   refreshTokens          RefreshToken[]       @relation("UserRefreshToken")
   banks                  Bank[]               @relation("BankUser")
+  merchant               Merchant?            @relation("UserMerchant")
+  merchantId             String?              @db.Char(36)
+  instution              Intitution?          @relation("UserIntitution", fields: [intitutionId], references: [id])
+  instutionId            String?              @db.Char(36)
+  verifications          Verification[]       @relation("VerificationUser")
+  intitutionId           String?              @db.Char(36)
 }
 
 model Agent {
-  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
-  userId        String         @unique @db.VarChar(30)
-  category      String?
-  user          User           @relation("UserAgent", fields: [userId], references: [id])
-  contactPhone  String?        @unique @db.VarChar(20)
-  contactEmail  String?
-  nationality   String?        @db.VarChar(100)
-  nextOfKin     String?
-  licenseNumber String?
-  addressId     String?        @db.Char(36)
-  address       Address?       @relation("AddressAgent", fields: [addressId], references: [id])
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @default(now()) @updatedAt @db.Timestamp(6)
-  nextOfKins    NextOfKin[]    @relation("NextOfKinAgent")
-  verifications Verification[] @relation("VerificationAgent")
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  userId      String     @unique @db.VarChar(36)
+  user        User       @relation("UserAgent", fields: [userId], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @default(now()) @updatedAt @db.Timestamp(6)
+  nextOfKinId String?    @unique @db.Char(36)
+  nextOfKin   NextOfKin? @relation("NextOfKinAgent", fields: [nextOfKinId], references: [id])
+}
+
+model Merchant {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  userId     String     @unique @db.VarChar(36)
+  user       User       @relation("UserMerchant", fields: [userId], references: [id])
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @default(now()) @updatedAt @db.Timestamp(6)
+  businesses Business[] @relation("BusinessMerchant")
+}
+
+model Intitution {
+  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @default(now()) @updatedAt @db.Timestamp(6)
+  users     User[]     @relation("UserIntitution")
+  Business  Business[]
 }
 
 model NextOfKin {
-  id           String @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
   name         String
-  phone        String @unique @db.VarChar(20)
+  phone        String  @unique @db.VarChar(20)
   relationship String
-  agentId      String @db.Char(36)
-  agent        Agent  @relation("NextOfKinAgent", fields: [agentId], references: [id])
+  agents       Agent[] @relation("NextOfKinAgent")
 }
 
 model Address {
@@ -82,28 +94,22 @@ model Address {
   createdAt      DateTime   @default(now())
   users          User[]     @relation("AddressUser")
   businesses     Business[] @relation("AddressBusiness")
-  agents         Agent[]    @relation("AddressAgent")
 }
 
 model Business {
-  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
-  type           String
-  name           String
-  verified       Boolean       @default(false)
-  startedAt      DateTime?     @db.Date
-  operationDays  String?
-  operatingHours String?
-  verificationId String?       @db.Char(36)
-  internetAccess Boolean       @default(true)
-  userBase       String        @default("1-50")
-  terminals      Int           @default(5)
-  userId         String        @db.Char(36)
-  user           User          @relation("UserBusiness", fields: [userId], references: [id])
-  verification   Verification? @relation("VerificationBusiness", fields: [verificationId], references: [id])
-  addressId      String?       @db.Char(36)
-  address        Address?      @relation("AddressBusiness", fields: [addressId], references: [id])
-  users          User[]        @relation("UserActiveBusiness")
-  banks          Bank[]        @relation("BankBusiness")
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  category      String
+  name          String
+  merchantId    String         @unique @db.VarChar(36)
+  merchant      Merchant       @relation("BusinessMerchant", fields: [merchantId], references: [id])
+  contactPhone  String?
+  contactEmail  String?
+  addressId     String?        @db.Char(36)
+  address       Address?       @relation("AddressBusiness", fields: [addressId], references: [id])
+  banks         Bank[]         @relation("BankBusiness")
+  verifications Verification[] @relation("VerificationBusiness")
+  Intitution    Intitution?    @relation(fields: [intitutionId], references: [id])
+  intitutionId  String?        @db.Char(36)
 }
 
 model RefreshToken {
@@ -129,20 +135,48 @@ model AuditLog {
 }
 
 model Verification {
-  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
-  IDType          String     @db.Char(36)
-  cac             String?
-  MEMART          String?
-  authorityLetter String?
-  tin             String?
-  IDFront         String?    @db.VarChar(2048)
-  IDBack          String?    @db.VarChar(2048)
-  passport        String?    @db.VarChar(2048)
-  utility         String?    @db.VarChar(2048)
-  biometric       Boolean    @default(false)
-  agentId         String?    @db.Char(36)
-  agent           Agent?     @relation("VerificationAgent", fields: [agentId], references: [id])
-  businesses      Business[] @relation("VerificationBusiness")
+  id          String                 @id @default(uuid())
+  userId      String?                @db.Char(36)
+  user        User?                  @relation("VerificationUser", fields: [userId], references: [id])
+  businessId  String?                @db.Char(36)
+  business    Business?              @relation("VerificationBusiness", fields: [businessId], references: [id])
+  status      VerificationStatus     @default(PENDING) // overall status
+  submittedAt DateTime               @default(now())
+  verifiedAt  DateTime?
+  documents   VerificationDocument[]
+}
+
+model VerificationDocument {
+  id              String             @id @default(uuid())
+  verificationId  String
+  verification    Verification       @relation(fields: [verificationId], references: [id])
+  type            DocumentType
+  fileUrl         String
+  status          VerificationStatus @default(PENDING)
+  reviewedBy      String?            @db.Char(36)
+  reviewNotes     String?
+  rejectionReason String?
+  submittedAt     DateTime           @default(now())
+  verifiedAt      DateTime?
+}
+
+enum DocumentType {
+  PASSPORT
+  NATIONAL_ID
+  DRIVER_LICENSE
+  UTILITY_BILL
+  VOTER_CARD
+  CAC
+  MEMART
+  IDFRONT
+  IDBACK
+  AUTHORITY_LETTER
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model Bank {
@@ -191,5 +225,6 @@ enum Gender {
 enum UserRole {
   USER
   AGENT
-  ADMIN
+  INSTITUTION
+  MERCHANT
 }

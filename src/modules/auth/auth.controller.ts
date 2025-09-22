@@ -1,216 +1,35 @@
-// src/modules/auth/auth.controller.ts
 import { Request, Response } from 'express';
 import * as authService from './auth.service';
 import { prisma } from '../../prisma/client';
 import {
-  ValidateAddress,
-  ValidateBank,
   ValidateForgotPassword,
   ValidateLogin,
   ValidateRegister,
   ValidateResetPassword,
-  ValidateUpdateUser,
-  ValidateVerification,
 } from './validator';
+import CustomError from '@/utils/customError';
+import { useErrorParser } from '@/utils';
+import { getUser } from '@/utils/getUser';
 
 export class AuthController {
   static async register(req: Request, res: Response) {
     try {
       const { error, value } = ValidateRegister().validate(req.body);
-      if (error) throw new Error(error.details[0].message);
+      if (error) throw new CustomError(error.details[0].message, 422);
 
-      const data = await authService.register(value);
-      return res.status(201).json(data);
-    } catch (error: any) {
-      return res.status(400).json({ error: error.message });
-    }
-  }
+      const user = await authService.register(value);
 
-  static async updateUser(req: Request, res: Response) {
-    try {
-      let user = req?.user;
-      if (!user) throw new Error('Unauthorized');
-
-      const { error, value } = ValidateUpdateUser().validate(req.body);
-      if (error) throw new Error(error.details[0].message);
-
-      user = await authService.update(user.id, value);
-
-      return res.status(200).json({
-        message: 'User updated successfully',
+      return res.status(201).json({
+        message: 'User created successfully',
+        status: 201,
         success: true,
         data: user,
       });
     } catch (error: any) {
-      return res.status(400).json({ error: error.message });
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
     }
   }
-
-  static async updateAgent(req: Request, res: Response) {
-    try {
-      let user = req?.user;
-      if (!user) throw new Error('Unauthorized');
-
-      const { error, value } = ValidateUpdateUser().validate(req.body);
-      if (error) throw new Error(error.details[0].message);
-
-      user = await authService.update(user.id, value);
-
-      authService.uploadFile(value?.passport, 'passport', user);
-      authService.uploadFile(value?.IDFront, 'front', user);
-      authService.uploadFile(value?.IDBack, 'back', user);
-      authService.uploadFile(value?.utility, 'utility', user);
-      authService.uploadFile(value?.cac, 'cac', user);
-
-      return res.status(200).json({
-        message: 'User updated successfully',
-        success: true,
-        data: user,
-      });
-    } catch (error: any) {
-      return res.status(400).json({ error: error.message });
-    }
-  }
-
-  static async addAddress(req: Request, res: Response) {
-    try {
-      const user = req?.user;
-      if (!user) throw new Error('Unauthenticated');
-
-      // Validation
-      const { error, value } = ValidateAddress().validate(req.body);
-      if (error) throw new Error(error.details[0].message);
-
-      const business = await prisma.business.findUnique({
-        where: { id: user.activeBusinessId! },
-      });
-
-      if (!business) throw new Error('No business found for this agent');
-
-      const updatedBusiness = await prisma.business.update({
-        where: { id: business.id },
-        data: {
-          ...value,
-        },
-      });
-
-      return res.status(200).json({
-        message: 'Business address updated successfully',
-        success: true,
-        data: updatedBusiness,
-      });
-    } catch (error: any) {
-      return res.status(500).json({
-        message: error?.message,
-        success: false,
-      });
-    }
-  }
-  static async addVerification(req: Request, res: Response) {
-    try {
-      const user = req?.user;
-      if (!user) throw new Error('Unauthenticated');
-
-      // Validation
-      const { error, value } = ValidateVerification().validate(req.body);
-      if (error) throw new Error(error.details[0].message);
-
-      const business = await prisma.business.findUnique({
-        where: { id: user.activeBusinessId! },
-      });
-
-      if (!business) throw new Error('No business found for this agent');
-
-      const updatedBusiness = await prisma.business.update({
-        where: { id: business.id },
-        data: {
-          ...value,
-        },
-      });
-
-      return res.status(200).json({
-        message: 'Business verification updated successfully',
-        success: true,
-        data: updatedBusiness,
-      });
-    } catch (error: any) {
-      return res.status(500).json({
-        message: error?.message,
-        success: false,
-      });
-    }
-  }
-  static async addBank(req: Request, res: Response) {
-    try {
-      const user = req?.user;
-      if (!user) throw new Error('Unauthenticated');
-
-      // Validation
-      const { error, value } = ValidateBank().validate(req.body);
-      if (error) throw new Error(error.details[0].message);
-
-      const business = await prisma.business.findUnique({
-        where: { id: user.activeBusinessId! },
-      });
-
-      if (!business) throw new Error('No business found for this agent');
-
-      const updatedBusiness = await prisma.business.update({
-        where: { id: business.id },
-        data: {
-          ...value,
-        },
-      });
-
-      return res.status(200).json({
-        message: 'Business bank updated successfully',
-        success: true,
-        data: updatedBusiness,
-      });
-    } catch (error: any) {
-      return res.status(500).json({
-        message: error?.message,
-        success: false,
-      });
-    }
-  }
-  static async addBusiness(req: Request, res: Response) {
-    try {
-      const user = req?.user;
-      if (!user) throw new Error('Unauthenticated');
-
-      // Validation
-      const { error, value } = ValidateAddress().validate(req.body);
-      if (error) throw new Error(error.details[0].message);
-
-      const business = await prisma.business.findUnique({
-        where: { id: user.activeBusinessId! },
-      });
-
-      if (!business) throw new Error('No business found for this agent');
-
-      const updatedBusiness = await prisma.business.update({
-        where: { id: business.id },
-        data: {
-          ...value,
-        },
-      });
-
-      return res.status(200).json({
-        message: 'Business address updated successfully',
-        success: true,
-        data: updatedBusiness,
-      });
-    } catch (error: any) {
-      return res.status(500).json({
-        message: error?.message,
-        success: false,
-      });
-    }
-  }
-  static async addReadiness(req: Request, res: Response) {}
-  static async submitBVN(req: Request, res: Response) {}
-  static async addPassword(req: Request, res: Response) {}
 
   static async login(req: Request, res: Response) {
     try {
@@ -232,7 +51,8 @@ export class AuthController {
       const data = await authService.forgotPassword(value);
       return res.status(200).json(data);
     } catch (error: any) {
-      return res.status(400).json({ error: error.message });
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
     }
   }
 
@@ -244,7 +64,40 @@ export class AuthController {
       const data = await authService.resetPassword(value);
       return res.status(200).json(data);
     } catch (error: any) {
-      return res.status(400).json({ error: error.message });
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
+    }
+  }
+
+  static async verifyOTP(req: Request, res: Response) {
+    try {
+      // Flaw: A user can use another user code to verify
+
+      const code = req.body?.code;
+      const id = req.params.id;
+
+      const verification = await prisma.verificationIntent.findFirst({
+        where: { refreshCode: code, userId: id },
+      });
+
+      if (!verification) throw new CustomError('Invalid OTP', 422);
+
+      // Delete all user OTP
+      // TODO: send to background
+      await prisma.verificationIntent.deleteMany({
+        where: { userId: verification.userId },
+      });
+
+      const user = await authService.update(id, { emailVerified: true });
+
+      return res.status(200).json({
+        msg: 'Verify Successful',
+        data: await getUser(user),
+        success: true,
+      });
+    } catch (error) {
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
     }
   }
 }

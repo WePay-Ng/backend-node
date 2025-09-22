@@ -1,4 +1,4 @@
-export type Role = 'USER' | 'AGENT' | 'ADMIN';
+export type Role = 'USER' | 'AGENT' | 'ADMIN' | 'MERCHANT' | 'INSTITUTION';
 export type Register = {
   email: string;
   bvn: string;
@@ -10,6 +10,16 @@ export type Login = {
   password: string;
   ip?: string;
   deviceInfo?: string;
+};
+
+export type Business = {
+  type: string;
+  name: string;
+  category: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  startedAt?: Date;
+  address?: Address;
 };
 
 export type ResetPassword = {

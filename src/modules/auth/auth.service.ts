@@ -13,21 +13,32 @@ import {
   ResetPassword,
 } from '../../types/types';
 import otpGenerator from 'otp-generator';
-import { uploadImage } from '../../utils/fileUploader';
 import sendEmail from '@/extensions/mail-service/send-email';
 import { User } from '@prisma/client';
+import { getUser } from '@/utils/getUser';
 
 export async function register(data: Register) {
   // hash bvn
   const bvnHash = hashToken(data.bvn);
 
   const existing = await prisma.user.findFirst({
-    where: { bvn: bvnHash },
+    where: { OR: [{ bvn: bvnHash }, { email: data.email }] },
   });
 
-  if (existing) throw new Error('Email already in use');
+  if (existing) {
+    if (existing.bvn === bvnHash) {
+      throw new Error('BVN already in use');
+    }
+    throw new Error('Email already in use');
+  }
 
-  const record: Record<string, unknown> = {};
+  // Prepare the user creation data
+  const record: Record<string, unknown> = {
+    email: data.email,
+    bvn: bvnHash,
+    role: data.role ?? 'USER',
+    ...data.extra,
+  };
 
   if (data.role === 'AGENT') {
     record.agent = {
@@ -35,24 +46,39 @@ export async function register(data: Register) {
     };
   }
 
-  const user = await prisma.user.create({
-    data: {
-      email: data?.email,
-      bvn: bvnHash,
-      role: data?.role ?? 'USER',
-      ...data.extra,
-      ...record,
-    },
+  if (data.role === 'MERCHANT') {
+    record.merchant = {
+      create: {},
+    };
+  }
+
+  if (data.role === 'INSTITUTION') {
+    record.merchant = {
+      create: {},
+    };
+  }
+
+  const user = await prisma.$transaction(async (tx) => {
+    const _user = await prisma.user.create({
+      data: {
+        email: data?.email,
+        bvn: bvnHash,
+        role: data?.role ?? 'USER',
+        ...data.extra,
+        ...record,
+      },
+    });
+
+    // TODO: Send OTP here
+    await sendOTP(_user);
+
+    await prisma.auditLog.create({
+      data: { userId: _user.id, action: 'REGISTER', ip: null },
+    });
+
+    return _user;
   });
-
-  // TODO: Send OTP here
-  sendOTP(user);
-
-  prisma.auditLog.create({
-    data: { userId: user.id, action: 'REGISTER', ip: null },
-  });
-
-  return user;
+  return await getUser(user);
 }
 
 export async function update(
@@ -60,33 +86,43 @@ export async function update(
   data: {
     password?: string;
     phone?: string;
+    dob?: string;
     nextOfKin?: NextOfKin;
     bank?: Bank;
     address?: Address;
+    emailVerified?: boolean;
   },
 ) {
   return await prisma.$transaction(async (tx) => {
     // Base update
+    const record: Record<string, unknown> = {};
+    if (data.password !== undefined) record.password = data.password;
+    if (data.phone !== undefined) record.phone = data.phone;
+    if (data.dob !== undefined) record.dob = data.dob;
+    if (data.emailVerified !== undefined)
+      record.emailVerified = data.emailVerified;
+
     const user = await tx.user.update({
       where: { id },
       data: {
-        ...(data.password && { password: data.password }),
-        ...(data.phone && { phone: data.phone }),
+        ...record,
       },
       include: { agent: { select: { id: true } } },
     });
 
     // Related updates
-    if (data.nextOfKin && user.agent?.id) {
-      await tx.nextOfKin.create({
+    if (data?.nextOfKin) {
+      await tx.agent.update({
+        where: { id: user.agent?.id },
         data: {
-          ...data.nextOfKin,
-          agentId: user.agent?.id!,
+          nextOfKin: {
+            create: { ...data.nextOfKin },
+          },
         },
       });
     }
 
-    if (data.bank) {
+    if (data?.bank) {
       await tx.bank.create({
         data: {
           ...data.bank,
@@ -96,9 +132,9 @@ export async function update(
       });
     }
 
-    if (data.address && user.agent?.id) {
-      await tx.agent.update({
-        where: { id: user.agent.id },
+    if (data?.address) {
+      await tx.user.update({
+        where: { id: user.id },
         data: {
           address: { create: { ...data.address } },
         },
@@ -114,7 +150,6 @@ export async function login(data: Login) {
   if (!user) throw new Error('Invalid credentials');
 
   // account lockout
-
   const ok = await verifyPassword(user.password!, data.password);
   if (!ok) {
     // increment failed attempts if you have fields; for now just log and throw
@@ -152,39 +187,8 @@ export async function login(data: Login) {
   return {
     accessToken,
     refreshToken: refreshRaw,
-    user: { id: user.id, email: user.email, role: user.role },
+    user: await getUser(user),
   };
-}
-
-export async function uploadFile(
-  id: string,
-  type: string,
-  file: any,
-  options?: Partial<Record<string, any>>,
-) {
-  if (!file) return;
-
-  try {
-    const url = await uploadImage(file, { prefix: options?.prefix });
-
-    const data: Record<string, unknown> = {};
-
-    if (type.includes('front')) data.IDFront = url;
-    if (type.includes('back')) data.IDBack = url;
-    if (type.includes('passport')) data.passport = url;
-    if (type.includes('utility')) data.utility = url;
-    if (type.includes('cac')) data.cac = url;
-
-    const verification = await prisma.verification.create({
-      data: {
-        agent: { connect: { id } },
-        IDType: type,
-        ...data,
-      },
-    });
-
-    return verification;
-  } catch (error) {}
 }
 
 export async function forgotPassword(data: { email: string; ip?: string }) {

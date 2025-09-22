@@ -1,4 +1,5 @@
-import { debug } from 'debug';
+import debugModule from 'debug';
+const debug = debugModule;
 
 export const logInfo = debug('api:info');
 export const logError = debug('api:error');

@@ -5,10 +5,10 @@ import { AuthController } from './auth.controller';
 const router = Router();
 
 router.post('/register', AuthController.register);
-router.put('/agents', AuthController.updateAgent);
-router.patch('/agents/:id', AuthController.updateAgent);
 router.post('/login', AuthController.login);
-router.post('/forgot-password', AuthController.forgotPassword);
-router.post('/reset-password', AuthController.resetPassword);
+router.post('/password/forgot', AuthController.forgotPassword);
+router.post('/password/reset', AuthController.resetPassword);
+router.put('/:id/verify', AuthController.verifyOTP);
+router.patch('/:id/verify', AuthController.verifyOTP);
 
 export default router;
