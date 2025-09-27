@@ -174,4 +174,20 @@ export class Controller {
       return res.status(e.status).json(e);
     }
   }
+
+  static async currentUser(req: Request, res: Response) {
+    try {
+      const user = req?.user;
+      if (!user) throw new CustomError('Unauthorized', 403);
+
+      return res.status(200).json({
+        msg: 'Logged in Successful',
+        data: user,
+        success: true,
+      });
+    } catch (error) {
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
+    }
+  }
 }

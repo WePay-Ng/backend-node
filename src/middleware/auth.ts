@@ -16,12 +16,12 @@ export default async function Auth(
 
     // retrieving user data
     const decodedToken = verifyAccessToken(token);
-    if (!decodedToken?.email)
+    if (!decodedToken?.sub)
       return res.status(401).json({ error: 'Invalid token!' });
 
     const user = await prisma.user.findFirst({
       where: {
-        email: decodedToken?.email,
+        id: decodedToken?.sub,
       },
     });
 

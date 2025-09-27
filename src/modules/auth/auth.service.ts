@@ -1,5 +1,10 @@
 import { prisma } from '../../prisma/client';
-import { hashPassword, verifyPassword, hashToken } from '../../utils/hash';
+import {
+  hashPassword,
+  verifyPassword,
+  hashToken,
+  verifyPin,
+} from '../../utils/hash';
 import { nanoid } from 'nanoid';
 import { environment } from '../../config/env';
 import { signAccessToken } from '../../utils/jwt';
@@ -146,15 +151,15 @@ export async function update(
 }
 
 export async function login(data: Login) {
-  const user = await prisma.user.findUnique({ where: { email: data.email } });
+  const user = await prisma.user.findUnique({ where: { phone: data.phone } });
   if (!user) throw new Error('Invalid credentials');
 
   // account lockout
-  const ok = await verifyPassword(user.password!, data.password);
+  const ok = await verifyPin(user.pin!, data.pin);
   if (!ok) {
     // increment failed attempts if you have fields; for now just log and throw
-    prisma.auditLog.create({
-      data: { userId: user.id, action: 'FAILED_LOGIN', ip: data.ip },
+    await prisma.auditLog.create({
+      data: { userId: user.id, action: 'FAILED_LOGIN' },
     });
     throw new Error('Invalid credentials');
   }
@@ -163,7 +168,10 @@ export async function login(data: Login) {
   const accessToken = signAccessToken({ sub: user.id, role: user.role });
   const refreshRaw = nanoid(64);
   const refreshHash = hashToken(refreshRaw);
-  const refreshExpires = addDays(new Date(), Number(environment.jwt.expiresIn));
+  const refreshExpires = addDays(
+    new Date(),
+    Number(environment.jwt.expiresIn.split(' ')[0]),
+  );
 
   // persist refresh token server-side (requires RefreshToken model)
   await prisma.refreshToken.create({
@@ -171,21 +179,18 @@ export async function login(data: Login) {
       userId: user.id,
       tokenHash: refreshHash,
       expiresAt: refreshExpires,
-      deviceInfo: data.deviceInfo,
     },
   });
 
-  prisma.auditLog.create({
+  await prisma.auditLog.create({
     data: {
       userId: user.id,
       action: 'LOGIN',
-      ip: data.ip,
-      meta: { deviceInfo: data.deviceInfo },
     },
   });
 
   return {
-    accessToken,
+    accessToken: `Bearer ${accessToken}`,
     refreshToken: refreshRaw,
     user: await getUser(user),
   };

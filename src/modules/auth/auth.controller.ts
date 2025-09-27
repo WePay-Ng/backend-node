@@ -37,9 +37,14 @@ export class AuthController {
       if (error) throw new Error(error.details[0].message);
 
       const data = await authService.login(value);
-      return res.status(200).json(data);
+      return res.status(200).json({
+        message: 'Login successfully',
+        success: true,
+        data,
+      });
     } catch (error: any) {
-      return res.status(401).json({ error: error.message });
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
     }
   }
 

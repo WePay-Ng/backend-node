@@ -7,6 +7,7 @@ export interface AuthJwtPayload extends JwtPayload {
 }
 
 export function signAccessToken(payload: object) {
+  console.log(environment.jwt?.expiresIn);
   return jwt.sign(
     payload,
     environment.jwt.secret as string,
@@ -17,6 +18,7 @@ export function signAccessToken(payload: object) {
 }
 
 export function verifyAccessToken(token: string): AuthJwtPayload {
+  console.log(token);
   return jwt.verify(token, environment.jwt.secret) as AuthJwtPayload;
 }
 

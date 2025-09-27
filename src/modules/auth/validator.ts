@@ -15,10 +15,8 @@ export function ValidateRegister() {
 
 export function ValidateLogin() {
   return Joi.object({
-    email: Joi.string().email().required(),
-    password: Joi.string().required(),
-    ip: Joi.string().optional(),
-    deviceInfo: Joi.string().optional(),
+    phone: Joi.string().required(),
+    pin: Joi.string().required(),
   });
 }
 

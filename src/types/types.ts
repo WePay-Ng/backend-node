@@ -6,10 +6,8 @@ export type Register = {
   extra: Record<string, any>;
 };
 export type Login = {
-  email: string;
-  password: string;
-  ip?: string;
-  deviceInfo?: string;
+  phone: string;
+  pin: string;
 };
 
 export type Business = {
