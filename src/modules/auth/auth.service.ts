@@ -1,10 +1,5 @@
 import { prisma } from '../../prisma/client';
-import {
-  hashPassword,
-  verifyPassword,
-  hashToken,
-  verifyPin,
-} from '../../utils/hash';
+import { hashPassword, hashToken, verifyPin } from '../../utils/hash';
 import { nanoid } from 'nanoid';
 import { environment } from '../../config/env';
 import { signAccessToken } from '../../utils/jwt';
@@ -17,31 +12,18 @@ import {
   Register,
   ResetPassword,
 } from '../../types/types';
-import otpGenerator from 'otp-generator';
-import sendEmail from '@/extensions/mail-service/send-email';
-import { User } from '@prisma/client';
 import { getUser } from '@/utils/getUser';
+import { sendOTP } from '@/utils';
 
 export async function register(data: Register) {
-  // hash bvn
-  const bvnHash = hashToken(data.bvn);
-
-  const existing = await prisma.user.findFirst({
-    where: { OR: [{ bvn: bvnHash }, { email: data.email }] },
-  });
-
-  if (existing) {
-    if (existing.bvn === bvnHash) {
-      throw new Error('BVN already in use');
-    }
-    throw new Error('Email already in use');
+  if (data.email) {
+    const existing = await prisma.user.findFirst({
+      where: { email: data.email },
+    });
+    if (existing) throw new Error('Email already in use');
   }
-
   // Prepare the user creation data
   const record: Record<string, unknown> = {
-    email: data.email,
-    bvn: bvnHash,
-    role: data.role ?? 'USER',
     ...data.extra,
   };
 
@@ -62,27 +44,28 @@ export async function register(data: Register) {
       create: {},
     };
   }
+  // hash bvn
+  const bvnHash = hashToken(data.bvn);
 
   const user = await prisma.$transaction(async (tx) => {
-    const _user = await prisma.user.create({
+    const _user = await tx.user.create({
       data: {
         email: data?.email,
         bvn: bvnHash,
-        role: data?.role ?? 'USER',
-        ...data.extra,
         ...record,
       },
     });
 
-    // TODO: Send OTP here
-    await sendOTP(_user);
-
-    await prisma.auditLog.create({
+    await tx.auditLog.create({
       data: { userId: _user.id, action: 'REGISTER', ip: null },
     });
 
     return _user;
   });
+
+  // TODO: Send OTP here
+  await sendOTP(user);
+
   return await getUser(user);
 }
 
@@ -297,31 +280,12 @@ export async function logout(refreshTokenRaw?: string, ip?: string) {
   // audit log optional
 }
 
-async function sendOTP(user: User) {
-  const code = otpGenerator.generate(6, {
-    lowerCaseAlphabets: false,
-    upperCaseAlphabets: false,
-    specialChars: false,
+export async function validateBVN(bvn: string) {
+  const bvnHash = hashToken(bvn);
+
+  const existing = await prisma.user.findFirst({
+    where: { bvn: bvnHash },
   });
 
-  const verification = await prisma.verificationIntent.create({
-    data: {
-      refreshCode: code,
-      userId: user.id,
-      type: 'EMAIL',
-    },
-  });
-
-  if (!verification) throw new Error('OTP not saved');
-
-  await sendEmail({
-    to: user.email,
-    variables: {
-      code: code,
-      email: user.email,
-      to_name: user.name,
-      // BASE_URL: data?.BASE_URL,
-    },
-    template: 'verification',
-  });
+  return !!existing;
 }

@@ -8,8 +8,9 @@ import {
   ValidateResetPassword,
 } from './validator';
 import CustomError from '@/utils/customError';
-import { useErrorParser } from '@/utils';
+import { toISODate, useErrorParser } from '@/utils';
 import { getUser } from '@/utils/getUser';
+import { Youverify } from '@/extensions/you-verify';
 
 export class AuthController {
   static async register(req: Request, res: Response) {
@@ -17,7 +18,25 @@ export class AuthController {
       const { error, value } = ValidateRegister().validate(req.body);
       if (error) throw new CustomError(error.details[0].message, 422);
 
-      const user = await authService.register(value);
+      const exist = await authService.validateBVN(value.bvn);
+      if (exist) throw new Error('BVN already in use');
+
+      const data = await Youverify.verifyBVN({
+        id: value.bvn,
+        isSubjectConsent: true,
+      });
+
+      const payload = {
+        ...value,
+        extra: {
+          name: data?.firstName + ' ' + data?.lastName,
+          phone: data?.mobile,
+          dob: toISODate(data?.dateOfBirth),
+          country: data?.country,
+          gender: data?.gender,
+        },
+      };
+      const user = await authService.register(payload);
 
       return res.status(201).json({
         message: 'User created successfully',
@@ -76,7 +95,7 @@ export class AuthController {
 
   static async verifyOTP(req: Request, res: Response) {
     try {
-      // Flaw: A user can use another user code to verify
+      // Flaw: A user can use another user code to verify except userID is passed
 
       const code = req.body?.code;
       const id = req.params.id;

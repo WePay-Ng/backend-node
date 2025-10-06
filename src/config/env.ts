@@ -24,7 +24,15 @@ export interface Environment {
   database: {
     url: string;
   };
-
+  youverify: {
+    url: string;
+    key: string;
+  };
+  embedly: {
+    id: string;
+    key: string;
+    url: string;
+  };
   mail: {
     host: string;
     port: number;
@@ -111,7 +119,15 @@ export const environment: Environment = {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     callbackURL: process.env.GOOGLE_CALLBACK!,
   },
-
+  youverify: {
+    url: process.env.YOUVERIFY_URL as string,
+    key: process.env.YOUVERIFY_KEY as string,
+  },
+  embedly: {
+    id: process.env.EMBEDLY_ID as string,
+    key: process.env.EMBEDLY_KEY as string,
+    url: process.env.EMBEDLY_URL as string,
+  },
   cloudflare: {
     bucket: process.env.CLOUDFLARE_BUCKET_NAME as string,
     key: process.env.CLOUDFLARE_ACCESS_KEY_ID as string,

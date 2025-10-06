@@ -9,9 +9,10 @@ datasource db {
 
 model User {
   id                     String               @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
-  email                  String               @unique
+  email                  String?              @unique
   password               String?              @db.VarChar(60)
   name                   String?
+  country                String?              @db.VarChar(100)
   bvn                    String?              @db.VarChar(64)
   gender                 Gender               @default(Male)
   dob                    DateTime?            @db.Date

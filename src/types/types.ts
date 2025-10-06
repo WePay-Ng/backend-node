@@ -49,3 +49,11 @@ export type NextOfKin = {
   phone: string;
   relationship: string;
 };
+
+export type UVerifyBVN = {
+  id: string;
+  isSubjectConsent: boolean;
+  lastName?: string;
+  firstName?: string;
+  shouldRetrivedNin?: boolean;
+};
