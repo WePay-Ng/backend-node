@@ -37,7 +37,7 @@ export default async ({ to, template, variables, templateId }: SendEmail) => {
 
   new Promise((resolve, reject) => {
     // create message
-    var mailOptions: MailOptions = {
+    const mailOptions: MailOptions = {
       from: `"${process.env.APP_NAME}" <info@pressmoni.com>`,
       to,
       subject,
