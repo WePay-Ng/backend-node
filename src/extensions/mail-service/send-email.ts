@@ -60,6 +60,7 @@ export default async ({ to, template, variables, templateId }: SendEmail) => {
 
     transporter.sendMail(mailOptions, (error, info) => {
       if (error) {
+        console.log(error);
         logError('sendEmail %o', { mailOptions, error });
         reject(new Error('try email again later'));
         return;
