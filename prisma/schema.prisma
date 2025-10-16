@@ -12,6 +12,7 @@ model User {
   email                  String?              @unique
   password               String?              @db.VarChar(60)
   name                   String?
+  embedlyCustomerId      String?              @db.Char(36)
   country                String?              @db.VarChar(100)
   bvn                    String?              @db.VarChar(64)
   gender                 Gender               @default(Male)
@@ -44,6 +45,7 @@ model User {
   instutionId            String?              @db.Char(36)
   verifications          Verification[]       @relation("VerificationUser")
   intitutionId           String?              @db.Char(36)
+  wallets                Wallet[]             @relation("WalletUser")
 }
 
 model Agent {
@@ -211,6 +213,107 @@ model VerificationIntent {
   expiresAt   DateTime               @default(dbgenerated("NOW() + interval '60 minutes'")) @db.Timestamp(6)
   createdAt   DateTime               @default(now()) @db.Timestamp(6)
   updatedAt   DateTime               @default(now()) @updatedAt @db.Timestamp(6)
+}
+
+model Wallet {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  userId           String   @db.Char(36)
+  walletId         String
+  bankName         String   @db.Char(20)
+  bankCode         String   @db.Char(3)
+  accountNumber    String   @db.Char(10)
+  availableBalance BigInt   @default(0)
+  ledgerBalance    BigInt   @default(0)
+  reservedBalance  BigInt   @default(0) // funds reserved for pending transfers
+  version          Int      @default(1) // optimistic version / CAS
+  ledgerEntries    Ledger[] @relation("WalletLedger")
+  user             User?    @relation("WalletUser", fields: [userId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+
+  @@unique([walletId])
+  @@index([userId])
+}
+
+model Transfer {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  idempotencyKey String?        @unique
+  fromWalletId   String         @db.Char(36)
+  toWalletId     String         @db.Char(36)
+  amount         BigInt
+  currency       String         @default("NGN")
+  status         TransferStatus @default(PENDING)
+  initiatedBy    String? // userId who initiated
+  reason         String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @default(now()) @updatedAt
+  ledgerEntries  Ledger[]       @relation("TransferLedger")
+
+  @@index([fromWalletId])
+  @@index([toWalletId])
+  @@index([createdAt])
+}
+
+model Ledger {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  walletId     String        @db.Char(36)
+  transferId   String?       @db.Char(36)
+  journalId    String?       @db.Char(36) // groups ledger rows for double-entry
+  change       BigInt // negative for debit, positive for credit
+  balanceAfter BigInt
+  type         LedgerType
+  metadata     Json?
+  createdAt    DateTime      @default(now())
+  journal      JournalEntry? @relation("JournalLedgers", fields: [journalId], references: [id])
+  wallet       Wallet        @relation("WalletLedger", fields: [walletId], references: [id])
+  transfer     Transfer?     @relation("TransferLedger", fields: [transferId], references: [id])
+
+  @@index([walletId])
+  @@index([journalId])
+  @@index([transferId])
+}
+
+model OutboxEvent {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  aggregateId String?
+  topic       String
+  payload     Json
+  published   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  publishedAt DateTime?
+}
+
+model JournalEntry {
+  /**
+   * A JournalEntry represents a single double-entry transaction (one credit + one debit; or many-line journal)
+   * Each Wallet Ledger row references its JournalEntry. This makes it easy to reconcile and to ensure double-entry invariants.
+   */
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  reference   String? // external provider ref (eg Embedly reference)
+  transferId  String?   @db.Char(36)
+  description String?
+  createdAt   DateTime  @default(now())
+  postedAt    DateTime?
+
+  // child ledger rows (should normally be 2 for a simple transfer)
+  ledgers Ledger[] @relation("JournalLedgers")
+
+  @@index([transferId])
+  @@index([reference])
+}
+
+enum TransferStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum LedgerType {
+  TRANSFER_DEBIT
+  TRANSFER_CREDIT
+  FEE
+  ADJUSTMENT
 }
 
 enum VerificationIntentType {

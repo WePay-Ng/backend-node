@@ -18,7 +18,6 @@ export function signAccessToken(payload: object) {
 }
 
 export function verifyAccessToken(token: string): AuthJwtPayload {
-  console.log(token);
   return jwt.verify(token, environment.jwt.secret) as AuthJwtPayload;
 }
 

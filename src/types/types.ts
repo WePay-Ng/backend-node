@@ -57,3 +57,26 @@ export type UVerifyBVN = {
   firstName?: string;
   shouldRetrivedNin?: boolean;
 };
+
+export type TransferPayload = {
+  idempotencyKey?: string;
+  initiatorUserId: string;
+  fromPhone: string;
+  toPhone?: string; // for internal transfers
+  amount: bigint | number; // smallest unit
+  currency?: string;
+  reason?: string;
+};
+
+export interface ExternalTransferInput {
+  idempotencyKey: string;
+  initiatorUserId: string;
+  senderName: string;
+  fromPhone: string;
+  destinationBank: string;
+  destinationAccountNumber: string;
+  destinationAccountName: string;
+  amount: number; // in kobo
+  currency?: string;
+  reason?: string;
+}

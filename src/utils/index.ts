@@ -42,7 +42,7 @@ export async function sendOTP(
   if (!verification) throw new Error('OTP not saved');
 
   await sendEmail({
-    to: user.email,
+    to: user?.email!,
     variables: {
       code: code,
       email: user.email,
@@ -82,4 +82,22 @@ export function toISODate(input: string | number | Date): string | null {
 
 export function findItem(data: Array<any>, item: string, field: string) {
   return data.find((d) => d[field] === item);
+}
+
+/**
+ * Acquire row locks for wallets in canonical order inside a transaction.
+ * Returns wallet rows.
+ */
+export async function lockWalletsTx(tx: any, walletIds: string[]) {
+  // ensure canonical order to avoid deadlocks
+  const ordered = [...walletIds].sort();
+  // build parameterized query
+  const placeholders = ordered.map((_, i) => `$${i + 1}`).join(',');
+  // NOTE: we assume table name "Wallet" and column "id"
+  const rows = await tx.$queryRawUnsafe(
+    `SELECT * FROM "Wallet" WHERE id IN (${placeholders}) FOR UPDATE`,
+    ...ordered,
+  );
+  // return rows as-is
+  return rows;
 }

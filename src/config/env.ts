@@ -20,7 +20,11 @@ export interface Environment {
   password: {
     passwordResetsIn: number;
   };
-
+  qoreId: {
+    url: string;
+    client: string;
+    secret: string;
+  };
   database: {
     url: string;
   };
@@ -28,10 +32,16 @@ export interface Environment {
     url: string;
     key: string;
   };
+  akuuk: {
+    url: string;
+    secret: string;
+    key: string;
+  };
   embedly: {
     id: string;
     key: string;
     url: string;
+    payoutURL: string;
   };
   mail: {
     host: string;
@@ -127,11 +137,23 @@ export const environment: Environment = {
     id: process.env.EMBEDLY_ID as string,
     key: process.env.EMBEDLY_KEY as string,
     url: process.env.EMBEDLY_URL as string,
+    payoutURL: process.env.EMBEDLY_PAYOUT_URL as string,
   },
   cloudflare: {
     bucket: process.env.CLOUDFLARE_BUCKET_NAME as string,
     key: process.env.CLOUDFLARE_ACCESS_KEY_ID as string,
     secret: process.env.CLOUDFLARE_SECRET_ACCESS_KEY as string,
     url: process.env.CLOUDFLARE_BUCKET_URL as string,
+  },
+
+  qoreId: {
+    url: process.env.QOREID_BASE_URL as string,
+    client: process.env.QOREID_CLIENT as string,
+    secret: process.env.QOREID_SECRET as string,
+  },
+  akuuk: {
+    url: process.env.AKUUK_BASE_URL as string,
+    key: process.env.AKUUK_KEY as string,
+    secret: process.env.AKUUK_SECRET as string,
   },
 };

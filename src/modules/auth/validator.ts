@@ -13,17 +13,29 @@ export function ValidateRegister() {
   });
 }
 
+export function ValidateForgotPin() {
+  return Joi.object({
+    phone: Joi.string().optional(),
+    email: Joi.string().optional(),
+  }).or('phone', 'email');
+}
+
 export function ValidateLogin() {
   return Joi.object({
     phone: Joi.string().required(),
-    pin: Joi.string().required(),
+    pin: Joi.string().min(4).max(4).required(),
   });
 }
 
 export function ValidateResetPassword() {
   return Joi.object({
-    token: Joi.string().required(),
     newPassword: Joi.string().min(8).required(),
+  });
+}
+
+export function ValidateResetPin() {
+  return Joi.object({
+    pin: Joi.string().min(4).max(4).required(),
   });
 }
 

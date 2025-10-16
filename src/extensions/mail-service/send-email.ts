@@ -36,10 +36,9 @@ export default async ({ to, template, variables, templateId }: SendEmail) => {
   });
 
   new Promise((resolve, reject) => {
-    // if (environment.context !== "PRODUCTION") {
     // create message
     var mailOptions: MailOptions = {
-      from: `"${process.env.APP_NAME}" <info@masteringbackend.com>`,
+      from: `"${process.env.APP_NAME}" <info@pressmoni.com>`,
       to,
       subject,
       html: temp ?? '<h2>Check the subject </h2>',
@@ -95,5 +94,5 @@ const selectTemplate = async ({ template, variables }: SelectTemplate) => {
     default:
       break;
   }
-  return { template, subject };
+  return { template: _template, subject };
 };

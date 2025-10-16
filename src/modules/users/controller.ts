@@ -88,7 +88,7 @@ export class Controller {
       const isVerified = await userService.verifyUserPin(user.pin!, value);
 
       return res.status(200).json({
-        message: 'User pin added successfully',
+        message: 'User pin verified successfully',
         success: true,
         data: {
           isVerified,

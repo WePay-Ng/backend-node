@@ -3,7 +3,7 @@ import { hashPassword, hashToken, verifyPin } from '../../utils/hash';
 import { nanoid } from 'nanoid';
 import { environment } from '../../config/env';
 import { signAccessToken } from '../../utils/jwt';
-import { addMinutes, addDays } from 'date-fns';
+import { addDays } from 'date-fns';
 import {
   Address,
   Bank,
@@ -14,9 +14,10 @@ import {
 } from '../../types/types';
 import { getUser } from '@/utils/getUser';
 import { sendOTP } from '@/utils';
+import { User } from '@prisma/client';
 
 export async function register(data: Register) {
-  if (data.email) {
+  if (data?.email) {
     const existing = await prisma.user.findFirst({
       where: { email: data.email },
     });
@@ -27,33 +28,32 @@ export async function register(data: Register) {
     ...data.extra,
   };
 
-  if (data.role === 'AGENT') {
+  if (data.role === 'AGENT')
     record.agent = {
       create: {},
     };
-  }
 
-  if (data.role === 'MERCHANT') {
+  if (data.role === 'MERCHANT')
     record.merchant = {
       create: {},
     };
-  }
 
-  if (data.role === 'INSTITUTION') {
+  if (data.role === 'INSTITUTION')
     record.merchant = {
       create: {},
     };
-  }
+
   // hash bvn
   const bvnHash = hashToken(data.bvn);
-
+  if (data?.email !== undefined) record.email = data.email;
+  console.log(data.email);
   const user = await prisma.$transaction(async (tx) => {
     const _user = await tx.user.create({
       data: {
-        email: data?.email,
         bvn: bvnHash,
         ...record,
       },
+      include: { address: true },
     });
 
     await tx.auditLog.create({
@@ -67,6 +67,34 @@ export async function register(data: Register) {
   await sendOTP(user);
 
   return await getUser(user);
+}
+
+export async function forgotPin(payload: {
+  phone?: string;
+  email?: string;
+}): Promise<boolean> {
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        {
+          phone: payload?.phone,
+        },
+        {
+          email: payload?.email,
+        },
+      ],
+    },
+  });
+
+  if (!user) return false;
+
+  // TODO: Send OTP here
+  await sendOTP(user, payload.phone ? 'PHONE' : 'EMAIL');
+
+  await prisma.auditLog.create({
+    data: { userId: user.id, action: 'FORGOT_PASSWORD_CODE' },
+  });
+  return true;
 }
 
 export async function update(
@@ -181,54 +209,51 @@ export async function login(data: Login) {
 
 export async function forgotPassword(data: { email: string; ip?: string }) {
   const user = await prisma.user.findUnique({ where: { email: data.email } });
-  if (!user) {
-    return false;
-  }
+  if (!user) return false;
 
-  const raw = nanoid(48);
-  const tokenHash = hashToken(raw);
-  const expires = addMinutes(new Date(), environment.password.passwordResetsIn);
+  await sendOTP(user, 'EMAIL');
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      passwordResetTokenHash: tokenHash,
-      passwordResetExpires: expires,
-    },
+  await prisma.auditLog.create({
+    data: { userId: user.id, action: 'FORGOT_PASSWORD_CODE', ip: data.ip },
   });
 
-  prisma.auditLog.create({
-    data: { userId: user.id, action: 'FORGOT_PASSWORD', ip: data.ip },
-  });
+  return true;
 }
 
 export async function resetPassword(data: ResetPassword) {
   const user = await prisma.user.findUnique({ where: { email: data.email } });
-  if (!user || !user.passwordResetTokenHash || !user.passwordResetExpires) {
-    throw new Error('Invalid or expired token');
-  }
-
-  if (user.passwordResetExpires < new Date()) throw new Error('Token expired');
-
-  const tokenHash = hashToken(data.token);
-  if (tokenHash !== user.passwordResetTokenHash)
-    throw new Error('Invalid token');
+  if (!user) throw new Error('Invalid or expired token');
 
   const newHash = await hashPassword(data.newPassword);
   await prisma.user.update({
     where: { id: user.id },
     data: {
       password: newHash,
-      passwordResetTokenHash: null,
-      passwordResetExpires: null,
     },
   });
 
   // revoke all refresh tokens (safety)
-  await prisma.refreshToken.deleteMany({ where: { userId: user.id } });
+  await prisma.verificationIntent.deleteMany({ where: { userId: user.id } });
   await prisma.auditLog.create({
     data: { userId: user.id, action: 'RESET_PASSWORD', ip: data.ip },
   });
+  return user;
+}
+
+export async function resetPin(user: User, data: { pin: string }) {
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      pin: data.pin,
+    },
+  });
+
+  // revoke all refresh tokens (safety)
+  await prisma.verificationIntent.deleteMany({ where: { userId: user.id } });
+  await prisma.auditLog.create({
+    data: { userId: user.id, action: 'RESET_PIN' },
+  });
+  return user;
 }
 
 export async function rotateRefreshToken(
