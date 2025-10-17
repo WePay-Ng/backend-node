@@ -5,6 +5,7 @@ import welcome from './templates/welcome';
 import verificationEmail from './templates/verification-email';
 import { environment } from '@/config/env';
 import { logError } from '@/utils/logger';
+import { Resend } from 'resend';
 
 export interface SendEmail {
   to: string;
@@ -34,6 +35,23 @@ export default async ({ to, template, variables, templateId }: SendEmail) => {
     template,
     variables,
   });
+
+  if (environment.context.includes('PRODUCTION')) {
+    const resend = new Resend(process.env.RESEND_KEY);
+    const { data, error } = await resend.emails.send({
+      from: `"${process.env.APP_NAME}" <info@pressmoni.com>`,
+      to: to,
+      subject: subject,
+      html: temp ?? '<h2>Check the subject </h2>',
+    });
+
+    if (error) {
+      console.log(error);
+      return;
+    }
+
+    return data;
+  }
 
   new Promise((resolve, reject) => {
     // create message
