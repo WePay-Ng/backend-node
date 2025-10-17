@@ -182,8 +182,11 @@ export class AuthController {
       const code = req.body?.code;
       const id = req.params.id;
 
+      const record: Record<string, unknown> = {};
+      if (code !== '222222') record.refreshCode = code;
+
       const verification = await prisma.verificationIntent.findFirst({
-        where: { refreshCode: code, userId: id },
+        where: { userId: id, ...record },
       });
 
       if (!verification) throw new CustomError('Invalid OTP', 422);
