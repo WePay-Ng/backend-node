@@ -53,6 +53,8 @@ export default async ({ to, template, variables, templateId }: SendEmail) => {
       },
     };
 
+    console.log(mailOptions, mailConfig);
+
     if (environment.mail?.host?.includes('gmail'))
       mailConfig['service'] = environment.mail?.host;
 
