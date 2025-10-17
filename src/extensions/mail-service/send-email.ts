@@ -39,7 +39,7 @@ export default async ({ to, template, variables, templateId }: SendEmail) => {
   if (environment.context.includes('PRODUCTION')) {
     const resend = new Resend(process.env.RESEND_KEY);
     const { data, error } = await resend.emails.send({
-      from: `"${process.env.APP_NAME}" <info@pressmoni.com>`,
+      from: `"${process.env.APP_NAME}" <info@masteringbackend.com>`,
       to: to,
       subject: subject,
       html: temp ?? '<h2>Check the subject </h2>',
