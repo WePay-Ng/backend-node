@@ -15,6 +15,7 @@ export async function update(
     education?: string;
     religion?: string;
     maritalStatus?: string;
+    email?: string;
   },
 ) {
   return await prisma.$transaction(async (tx) => {
@@ -22,6 +23,7 @@ export async function update(
     const record: Record<string, unknown> = {};
 
     // TDOD: Remove password update from here
+    if (data.email !== undefined) record.email = data.email;
     if (data.occupation !== undefined) record.occupation = data.occupation;
     if (data.education !== undefined) record.education = data.education;
     if (data.religion !== undefined) record.religion = data.religion;

@@ -11,9 +11,9 @@ import Auth from './middleware/auth';
 const router = Router();
 
 router.use('/auth', authRoutes);
+router.use('/users', userRoutes);
 router.use('/webhooks', webhookRoutes);
 router.use('/agents', Auth, agentRoutes);
-router.use('/users', Auth, userRoutes);
 router.use('/merchants', Auth, merchantRoutes);
 router.use('/wallets', Auth, WalletRoutes);
 router.post('/uploads/url', Auth, BaseController.generateUploadURL);
