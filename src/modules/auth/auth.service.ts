@@ -46,7 +46,6 @@ export async function register(data: Register) {
   // hash bvn
   const bvnHash = hashToken(data.bvn);
   if (data?.email !== undefined) record.email = data.email;
-  console.log(data.email);
   const user = await prisma.$transaction(async (tx) => {
     const _user = await tx.user.create({
       data: {
