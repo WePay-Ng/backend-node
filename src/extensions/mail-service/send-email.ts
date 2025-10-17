@@ -66,6 +66,7 @@ export default async ({ to, template, variables, templateId }: SendEmail) => {
         return;
       }
       console.log(info);
+      transporter.close();
       resolve(info);
     });
     return;
