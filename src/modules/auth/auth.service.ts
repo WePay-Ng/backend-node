@@ -200,7 +200,7 @@ export async function login(data: Login) {
   });
 
   return {
-    accessToken: `Bearer ${accessToken}`,
+    accessToken: accessToken,
     refreshToken: refreshRaw,
     user: await getUser(user),
   };

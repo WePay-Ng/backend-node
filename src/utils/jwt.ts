@@ -11,7 +11,7 @@ export function signAccessToken(payload: object) {
     payload,
     environment.jwt.secret as string,
     {
-      expiresIn: environment.jwt?.expiresIn ?? '30 days',
+      expiresIn: `${environment.jwt?.expiresIn}h`,
     } as SignOptions,
   );
 }

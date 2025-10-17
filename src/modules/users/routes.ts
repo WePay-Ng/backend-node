@@ -11,6 +11,6 @@ router.put('/:id/credentials', Controller.setCredentials);
 router.patch('/:id/credentials', Controller.setCredentials);
 router.post('/:id/verification', Controller.addVerification);
 router.post('/:id/pin', Controller.createPin);
-router.post('/:id/verify', Controller.verifyPin);
+router.post('/:id/verify', Auth, Controller.verifyPin);
 
 export default router;

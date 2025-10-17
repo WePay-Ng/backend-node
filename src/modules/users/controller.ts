@@ -80,7 +80,7 @@ export class Controller {
   static async verifyPin(req: Request, res: Response) {
     try {
       const user = req?.user;
-      if (!user) throw new CustomError('unauthorized', 402);
+      if (!user) throw new CustomError('unauthorized', 401);
 
       const { error, value } = ValidatePin().validate(req.body);
       if (error) throw new Error(error.details[0].message);
