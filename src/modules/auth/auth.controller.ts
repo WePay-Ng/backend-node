@@ -36,6 +36,7 @@ export class AuthController {
           dob: toISODate(data?.dateOfBirth),
           country: data?.country,
           gender: data?.gender,
+          phone: data?.phone,
         },
       };
 
