@@ -65,7 +65,7 @@ export default async ({ to, template, variables, templateId }: SendEmail) => {
         reject(new Error('try email again later'));
         return;
       }
-
+      console.log(info);
       resolve(info);
     });
     return;
