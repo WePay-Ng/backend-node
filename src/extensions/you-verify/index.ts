@@ -1,6 +1,6 @@
 import { environment } from '@/config/env';
 import { UVerifyBVN } from '@/types/types';
-import { useErrorParser } from '@/utils';
+import { generateRandom8DigitNumber, useErrorParser } from '@/utils';
 import CustomError from '@/utils/customError';
 import axios from 'axios';
 
@@ -21,6 +21,7 @@ export class Youverify {
           lastName: 'Demo',
           dateOfBirth: '12-12-1994',
           country: 'NG',
+          phone: '080' + generateRandom8DigitNumber(),
           gender: 'Male',
         };
 

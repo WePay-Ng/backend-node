@@ -21,6 +21,13 @@ export const useErrorParser = (err: { message: string; status: number }) => {
   };
 };
 
+export function generateRandom8DigitNumber() {
+  // Generate a random number between 10,000,000 (inclusive) and 99,999,999 (inclusive)
+  const min = 10000000; // Smallest 8-digit number
+  const max = 99999999; // Largest 8-digit number
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 export async function sendOTP(
   user: User,
   type: VerificationIntentType = 'EMAIL',
