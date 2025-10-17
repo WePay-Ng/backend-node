@@ -20,7 +20,7 @@ export const createApp = () => {
 
   // register routes
   app.use('/api/v1', Routes);
-  app.use(errorHandler);
+  // app.use(errorHandler);
 
   return app;
 };
