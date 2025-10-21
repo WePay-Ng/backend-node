@@ -34,8 +34,9 @@ export interface Environment {
   };
   akuuk: {
     url: string;
-    secret: string;
     key: string;
+    sender: string;
+    id: string;
   };
   embedly: {
     id: string;
@@ -153,7 +154,8 @@ export const environment: Environment = {
   },
   akuuk: {
     url: process.env.AKUUK_BASE_URL as string,
+    id: process.env.AKUUK_ACCOUNT_ID as string,
     key: process.env.AKUUK_KEY as string,
-    secret: process.env.AKUUK_SECRET as string,
+    sender: process.env.AKUUK_SENDER as string,
   },
 };

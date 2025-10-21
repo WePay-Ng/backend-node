@@ -4,6 +4,7 @@ import { User, VerificationIntentType } from '@prisma/client';
 import { prisma } from '@/prisma/client';
 import otpGenerator from 'otp-generator';
 import sendEmail from '@/extensions/mail-service/send-email';
+import { Akuuk } from '@/extensions/akuuk';
 
 export function fileDirName(meta: any) {
   const __filename = fileURLToPath(meta.url);
@@ -21,17 +22,14 @@ export const useErrorParser = (err: { message: string; status: number }) => {
   };
 };
 
-export function generateRandom8DigitNumber() {
-  // Generate a random number between 10,000,000 (inclusive) and 99,999,999 (inclusive)
-  const min = 10000000; // Smallest 8-digit number
-  const max = 99999999; // Largest 8-digit number
+export function generateRandomNumber(size: number): number {
+  if (size <= 0) throw new Error('Size must be greater than 0');
+  const min = Math.pow(10, size - 1);
+  const max = Math.pow(10, size) - 1;
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-export async function sendOTP(
-  user: User,
-  type: VerificationIntentType = 'EMAIL',
-) {
+export async function sendOTP(user: User) {
   const code = otpGenerator.generate(6, {
     lowerCaseAlphabets: false,
     upperCaseAlphabets: false,
@@ -42,22 +40,30 @@ export async function sendOTP(
     data: {
       refreshCode: code,
       userId: user.id,
-      type,
+      type: user.phone && !user?.email ? 'PHONE' : 'EMAIL',
     },
   });
 
   if (!verification) throw new Error('OTP not saved');
 
-  await sendEmail({
-    to: user?.email!,
-    variables: {
-      code: code,
-      email: user.email,
-      to_name: user.name,
-      // BASE_URL: data?.BASE_URL,
-    },
-    template: 'verification',
-  });
+  // Send SMS
+  if (user.phone)
+    Akuuk.sendSMS({
+      country: user?.country ?? 'NG',
+      number: user.phone, // Number('08145655380'),
+      message: `Your Wepay verification code is: ${code}`,
+    }).catch((e) => console.log(e));
+
+  if (user.email)
+    sendEmail({
+      to: user?.email!,
+      variables: {
+        code: code,
+        email: user.email,
+        to_name: user.name,
+      },
+      template: 'verification',
+    }).catch((e) => console.log(e));
 }
 
 /**
