@@ -2,50 +2,13 @@ import { environment } from '@/config/env';
 import CustomError from '@/utils/customError';
 import axios from 'axios';
 import { banks, countries, currencies, types } from './utils';
-import { findItem, generateRandomNumber, useErrorParser } from '@/utils';
-import { iWallet } from '@/types/types';
-
-type Personal = {
-  firstName: string;
-  lastName: string;
-  middleName: string;
-  emailAddress: string;
-  mobileNumber: string;
-  dob: string;
-  address: string;
-  city: string;
-  country: string;
-};
-
-type Transfer = {
-  fromAccount: string;
-  toAccount: string;
-  amount: number;
-  transactionReference: string;
-  remarks?: string;
-};
-
-type Payment = {
-  destinationBank: string;
-  destinationAccountNumber: string;
-  destinationAccountName: string;
-  sourceAccountNumber: string;
-  sourceAccountName: string;
-  remarks: string;
-  amount: number;
-  currency: string;
-};
-
-type Corporate = {
-  rcNumber: string;
-  tin: string;
-  fullBusinessName: string;
-  businessAddress: string;
-  city: string;
-  email: string;
-  country: string;
-  type: string;
-};
+import {
+  findItem,
+  generateRandomNumber,
+  isTestingBVN,
+  useErrorParser,
+} from '@/utils';
+import { Corporate, Payment, Personal, Transfer, iWallet } from '@/types/types';
 
 const Client = axios.create({
   baseURL: environment.embedly?.url ?? 'https://waas-staging.embedly.ng/api/v1',
@@ -136,9 +99,7 @@ class Customer {
   static async verifyKYC(payload: any) {
     try {
       let bvn = payload.bvn;
-      if (['22222222222', '95888168924'].includes(payload.bvn)) {
-        bvn = generateRandomNumber(11);
-      }
+      if (isTestingBVN(bvn)) bvn = generateRandomNumber(11);
 
       const res = await Client.post('/customers/kyc/premium-kyc?verify=1', {
         ...payload,

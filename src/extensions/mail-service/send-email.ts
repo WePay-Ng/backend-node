@@ -6,27 +6,7 @@ import verificationEmail from './templates/verification-email';
 import { environment } from '@/config/env';
 import { logError } from '@/utils/logger';
 import { Resend } from 'resend';
-
-export interface SendEmail {
-  to: string;
-  template?: string;
-  subject?: string;
-  variables?: any;
-  templateId?: number;
-  data?: any;
-}
-
-interface MailOptions {
-  from: any;
-  to: any;
-  subject: any;
-  html: any;
-}
-
-interface SelectTemplate {
-  template: string;
-  variables?: any;
-}
+import { MailOptions, SelectTemplate, SendEmail } from '@/types/types';
 
 export default async ({ to, template, variables, templateId }: SendEmail) => {
   if (!template) throw new Error('No mail template specified');
@@ -36,7 +16,7 @@ export default async ({ to, template, variables, templateId }: SendEmail) => {
     variables,
   });
 
-  if (environment.context.includes('PRODUCTION')) {
+  if (['PRODUCTION', 'DEVELOP'].includes(environment.context)) {
     const resend = new Resend(process.env.RESEND_KEY);
     const { data, error } = await resend.emails.send({
       from: `"${process.env.APP_NAME}" <info@emails.masteringbackend.com>`,

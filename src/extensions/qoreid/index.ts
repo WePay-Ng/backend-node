@@ -1,4 +1,5 @@
 import { environment } from '@/config/env';
+import { QoreIDBVN } from '@/types/types';
 import CustomError from '@/utils/customError';
 import axios from 'axios';
 
@@ -8,13 +9,6 @@ const Client = axios.create({
     authorization: environment.qoreId?.client ?? '',
   },
 });
-
-export type QoreIDBVN = {
-  bvn: string;
-  lastName?: string;
-  firstName?: string;
-};
-
 export class QoreID {
   static async verifyBVN(data: QoreIDBVN) {
     try {

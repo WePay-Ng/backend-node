@@ -11,7 +11,7 @@ import {
   ValidateResetPin,
 } from './validator';
 import CustomError from '@/utils/customError';
-import { useErrorParser } from '@/utils';
+import { isDev, useErrorParser } from '@/utils';
 import { getUser } from '@/utils/getUser';
 import Bottleneck from 'bottleneck';
 
@@ -173,7 +173,7 @@ export class AuthController {
       const id = req.params.id;
 
       const record: Record<string, unknown> = {};
-      if (code !== '222222') record.refreshCode = code;
+      if (isDev() && code !== '222222') record.refreshCode = code;
 
       const verification = await prisma.verificationIntent.findFirst({
         where: { userId: id, ...record },
@@ -182,10 +182,11 @@ export class AuthController {
       if (!verification) throw new CustomError('Invalid OTP', 422);
 
       // Delete all user OTP
-      // TODO: send to background
-      await prisma.verificationIntent.deleteMany({
-        where: { userId: verification.userId },
-      });
+      limiter.schedule(() =>
+        prisma.verificationIntent.deleteMany({
+          where: { userId: verification.userId },
+        }),
+      );
 
       const user = await userService.update(id, { emailVerified: true });
 

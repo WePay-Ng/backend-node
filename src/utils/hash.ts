@@ -2,6 +2,7 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import argon2 from 'argon2';
+import { isTestingBVN } from '.';
 
 export async function hashPassword(plain: string) {
   // default options for argon2 are fine; tune in prod if needed
@@ -13,7 +14,7 @@ export async function verifyPassword(hash: string, plain: string) {
 }
 
 export function hashToken(token: string) {
-  if (['22222222222', '95888168924'].includes(token)) {
+  if (isTestingBVN(token)) {
     return crypto
       .createHash('sha256')
       .update(token + new Date().getTime().toString().slice(6))

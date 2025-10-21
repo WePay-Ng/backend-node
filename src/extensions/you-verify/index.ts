@@ -1,6 +1,6 @@
 import { environment } from '@/config/env';
 import { UVerifyBVN } from '@/types/types';
-import { generateRandomNumber, useErrorParser } from '@/utils';
+import { generateRandomNumber, isTestingBVN, useErrorParser } from '@/utils';
 import CustomError from '@/utils/customError';
 import axios from 'axios';
 
@@ -15,7 +15,7 @@ export class Youverify {
   static async verifyBVN(data: UVerifyBVN) {
     try {
       // For testing purposes
-      if (['22222222222', '95888168924'].includes(data.id))
+      if (isTestingBVN(data.id))
         return {
           firstName: 'Bunch',
           lastName: 'Dillon',

@@ -69,6 +69,81 @@ export type NextOfKin = {
   relationship: string;
 };
 
+export interface SendEmail {
+  to: string;
+  template?: string;
+  subject?: string;
+  variables?: any;
+  templateId?: number;
+  data?: any;
+}
+
+export type SMSInput = {
+  country: string;
+  number: number | string;
+  message: string;
+};
+
+export type Personal = {
+  firstName: string;
+  lastName: string;
+  middleName: string;
+  emailAddress: string;
+  mobileNumber: string;
+  dob: string;
+  address: string;
+  city: string;
+  country: string;
+};
+
+export type Transfer = {
+  fromAccount: string;
+  toAccount: string;
+  amount: number;
+  transactionReference: string;
+  remarks?: string;
+};
+
+export type Payment = {
+  destinationBank: string;
+  destinationAccountNumber: string;
+  destinationAccountName: string;
+  sourceAccountNumber: string;
+  sourceAccountName: string;
+  remarks: string;
+  amount: number;
+  currency: string;
+};
+
+export type Corporate = {
+  rcNumber: string;
+  tin: string;
+  fullBusinessName: string;
+  businessAddress: string;
+  city: string;
+  email: string;
+  country: string;
+  type: string;
+};
+
+export type QoreIDBVN = {
+  bvn: string;
+  lastName?: string;
+  firstName?: string;
+};
+
+export interface MailOptions {
+  from: any;
+  to: any;
+  subject: any;
+  html: any;
+}
+
+export interface SelectTemplate {
+  template: string;
+  variables?: any;
+}
+
 export type UVerifyBVN = {
   id: string;
   isSubjectConsent: boolean;

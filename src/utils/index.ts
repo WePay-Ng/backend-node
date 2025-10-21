@@ -1,10 +1,11 @@
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { User, VerificationIntentType } from '@prisma/client';
+import { User } from '@prisma/client';
 import { prisma } from '@/prisma/client';
 import otpGenerator from 'otp-generator';
 import sendEmail from '@/extensions/mail-service/send-email';
 import { Akuuk } from '@/extensions/akuuk';
+import { environment } from '@/config/env';
 
 export function fileDirName(meta: any) {
   const __filename = fileURLToPath(meta.url);
@@ -29,6 +30,17 @@ export function generateRandomNumber(size: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+export function isTestingBVN(bvn: string) {
+  return (
+    ['DEVELOP', 'LOCAL'].includes(environment.context) &&
+    ['22222222222', '95888168924'].includes(bvn)
+  );
+}
+
+export function isDev() {
+  return ['DEVELOP', 'LOCAL'].includes(environment.context);
+}
+
 export async function sendOTP(user: User) {
   const code = otpGenerator.generate(6, {
     lowerCaseAlphabets: false,
@@ -50,7 +62,7 @@ export async function sendOTP(user: User) {
   if (user.phone)
     Akuuk.sendSMS({
       country: user?.country ?? 'NG',
-      number: user.phone, // Number('08145655380'),
+      number: user.phone,
       message: `Your Wepay verification code is: ${code}`,
     }).catch((e) => console.log(e));
 

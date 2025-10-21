@@ -3,12 +3,7 @@ import CustomError from '@/utils/customError';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
 import { countryCodes } from './utils';
-
-type SMSInput = {
-  country: string;
-  number: number | string;
-  message: string;
-};
+import { SMSInput } from '@/types/types';
 
 const acc = btoa(`${environment.akuuk?.id}:${environment.akuuk?.key}`);
 const Client = axios.create({
