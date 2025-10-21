@@ -9,7 +9,7 @@ import Routes from './routes';
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: false })); // tighten later
+app.use(cors({ origin: '*' })); // tighten later
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined'));
