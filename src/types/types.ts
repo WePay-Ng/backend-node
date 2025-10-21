@@ -1,6 +1,6 @@
 export type Role = 'USER' | 'AGENT' | 'MERCHANT' | 'INSTITUTION';
 export type Register = {
-  email: string;
+  email?: string;
   bvn: string;
   role: Role;
   extra: Record<string, any>;
@@ -8,6 +8,25 @@ export type Register = {
 export type Login = {
   phone: string;
   pin: string;
+};
+
+export type BVNInput = {
+  bvn: string;
+  email?: string;
+  role: Role;
+};
+
+export type EmbedlyInput = {
+  email: string;
+  bvn: string;
+  extra?: Record<string, any>;
+  embedly?: Record<string, any>;
+};
+
+export type iWallet = {
+  customerId: string;
+  currency: string;
+  name?: string;
 };
 
 export type Business = {

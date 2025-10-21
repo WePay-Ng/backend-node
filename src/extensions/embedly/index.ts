@@ -2,8 +2,8 @@ import { environment } from '@/config/env';
 import CustomError from '@/utils/customError';
 import axios from 'axios';
 import { banks, countries, currencies, types } from './utils';
-import { findItem, useErrorParser } from '@/utils';
-import { prisma } from '@/prisma/client';
+import { findItem, generateRandomNumber, useErrorParser } from '@/utils';
+import { iWallet } from '@/types/types';
 
 type Personal = {
   firstName: string;
@@ -15,13 +15,6 @@ type Personal = {
   address: string;
   city: string;
   country: string;
-  type: string;
-};
-
-type iWallet = {
-  customerId: string;
-  currency: string;
-  name?: string;
 };
 
 type Transfer = {
@@ -83,10 +76,10 @@ const PayoutClient = axios.create({
 class Customer {
   static async personal(payload: Personal) {
     try {
-      const customerTypeId = findItem(types, payload.type, 'name')?.id;
+      const customerTypeId = findItem(types, 'Individual', 'name')?.id;
       const eCountry = findItem(countries, payload.country, 'countryCodeTwo');
 
-      const { country, type, ...rest } = payload;
+      const { country, ...rest } = payload;
 
       const data = {
         ...rest,
@@ -96,13 +89,16 @@ class Customer {
       const res = await Client.post('/customers/add', data);
       const { data: result } = res;
 
-      if (result.statuscode !== '00')
-        throw new CustomError(result.message, 500);
+      if (result.code !== '00') throw new CustomError(result.message, 500);
+
       return result.data;
     } catch (error) {
       const res = error?.response?.data;
       if (res && !res.success)
-        throw new CustomError(res.message, res.statusCode);
+        throw new CustomError(
+          res?.message ?? res.title,
+          res?.statusCode ?? res.status,
+        );
 
       const e = useErrorParser(error);
       throw new CustomError(e?.message, e.status);
@@ -136,6 +132,31 @@ class Customer {
       throw new CustomError(e?.message, e.status);
     }
   }
+
+  static async verifyKYC(payload: any) {
+    try {
+      let bvn = payload.bvn;
+      if (['22222222222', '95888168924'].includes(payload.bvn)) {
+        bvn = generateRandomNumber(11);
+      }
+
+      const res = await Client.post('/customers/kyc/premium-kyc?verify=1', {
+        ...payload,
+        bvn,
+      });
+      const { data: result } = res;
+
+      if (result.code !== '00') throw new CustomError(result.message, 500);
+      return result.data;
+    } catch (error) {
+      const res = error?.response?.data;
+      if (res && !res.success)
+        throw new CustomError(res.message, res.statusCode);
+
+      const e = useErrorParser(error);
+      throw new CustomError(e?.message, e.status);
+    }
+  }
 }
 
 class Validation {
@@ -145,39 +166,19 @@ class Validation {
 
 class Wallet {
   static async create(wallet: iWallet) {
-    const user = await prisma.user.findFirst({
-      where: { embedlyCustomerId: wallet.customerId },
-    });
-    if (!user) throw new CustomError('Customer not found on embedly', 500);
+    const currency = currencies.find((c) => c.shortName === wallet.currency);
 
-    const currencyId = currencies.find((c) => c.shortName == wallet.currency);
-
-    const { currency, ...rest } = wallet;
+    const { currency: c, ...rest } = wallet;
     const res = await Client.post('/wallets/add', {
       ...rest,
-      currencyId,
+      currencyId: currency?.id,
     });
     const { data: result } = res;
 
-    if (!result?.walletId) throw new CustomError('Wallet creation failed', 500);
+    if (result?.code !== '00')
+      throw new CustomError('Wallet creation failed', 500);
 
-    // Create user wallet
-    const userWallet = await prisma.wallet.create({
-      data: {
-        accountNumber: result.virtualAccount.accountNumber,
-        bankCode: result.virtualAccount.bankCode,
-        bankName: result.virtualAccount.bankName,
-        walletId: result?.walletId,
-        availableBalance: 0,
-        ledgerBalance: 0,
-        userId: user.id,
-      },
-    });
-
-    return {
-      embedly: result,
-      userWallet,
-    };
+    return result.data;
   }
 
   static async get(id: string) {
@@ -221,16 +222,6 @@ class Bank {
     const bank = banks.find((b) => b.bankName === payload.destinationBank);
 
     const { currency: c, destinationBank, ...rest } = payload;
-
-    // console.log(
-    //   {
-    //     ...rest,
-    //     webhookUrl,
-    //     currencyId: currency?.id,
-    //     destinationBankCode: bank?.bankCode,
-    //   },
-    //   'PAYLOAD',
-    // );
 
     const res = await PayoutClient.post('/inter-bank-transfer', {
       ...rest,

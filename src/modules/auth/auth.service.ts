@@ -4,17 +4,16 @@ import { nanoid } from 'nanoid';
 import { environment } from '../../config/env';
 import { signAccessToken } from '../../utils/jwt';
 import { addDays } from 'date-fns';
-import {
-  Address,
-  Bank,
-  Login,
-  NextOfKin,
-  Register,
-  ResetPassword,
-} from '../../types/types';
+import { Login, Register, ResetPassword } from '../../types/types';
 import { getUser } from '@/utils/getUser';
 import { sendOTP } from '@/utils';
 import { User } from '@prisma/client';
+import Bottleneck from 'bottleneck';
+
+const limiter = new Bottleneck({
+  maxConcurrent: 1,
+  minTime: 333,
+});
 
 export async function register(data: Register) {
   if (data?.email) {
@@ -44,8 +43,10 @@ export async function register(data: Register) {
     };
 
   // hash bvn
-  const bvnHash = hashToken(data.bvn);
+  let bvnHash = hashToken(data.bvn);
+  if (data.role === 'USER') bvnHash = data.bvn; //Hashing will come when user add emails
   if (data?.email !== undefined) record.email = data.email;
+
   const user = await prisma.$transaction(async (tx) => {
     const _user = await tx.user.create({
       data: {
@@ -62,10 +63,9 @@ export async function register(data: Register) {
     return _user;
   });
 
-  // TODO: Send OTP here
-  await sendOTP(user);
+  limiter.schedule(() => sendOTP(user));
 
-  return await getUser(user);
+  return user;
 }
 
 export async function forgotPin(payload: {
@@ -87,77 +87,12 @@ export async function forgotPin(payload: {
 
   if (!user) return false;
 
-  // TODO: Send OTP here
-  await sendOTP(user, payload.phone ? 'PHONE' : 'EMAIL');
+  limiter.schedule(() => sendOTP(user));
 
   await prisma.auditLog.create({
     data: { userId: user.id, action: 'FORGOT_PASSWORD_CODE' },
   });
   return true;
-}
-
-export async function update(
-  id: string,
-  data: {
-    password?: string;
-    phone?: string;
-    dob?: string;
-    nextOfKin?: NextOfKin;
-    bank?: Bank;
-    address?: Address;
-    emailVerified?: boolean;
-  },
-) {
-  return await prisma.$transaction(async (tx) => {
-    // Base update
-    const record: Record<string, unknown> = {};
-    if (data.password !== undefined) record.password = data.password;
-    if (data.phone !== undefined) record.phone = data.phone;
-    if (data.dob !== undefined) record.dob = data.dob;
-    if (data.emailVerified !== undefined)
-      record.emailVerified = data.emailVerified;
-
-    const user = await tx.user.update({
-      where: { id },
-      data: {
-        ...record,
-      },
-      include: { agent: { select: { id: true } } },
-    });
-
-    // Related updates
-    if (data?.nextOfKin) {
-      await tx.agent.update({
-        where: { id: user.agent?.id },
-        data: {
-          nextOfKin: {
-            create: { ...data.nextOfKin },
-          },
-        },
-      });
-    }
-
-    if (data?.bank) {
-      await tx.bank.create({
-        data: {
-          ...data.bank,
-          userId: user.id,
-          accountNumber: Number(data.bank.accountNumber),
-        },
-      });
-    }
-
-    if (data?.address) {
-      await tx.user.update({
-        where: { id: user.id },
-        data: {
-          address: { create: { ...data.address } },
-        },
-      });
-    }
-
-    return user;
-  });
 }
 
 export async function login(data: Login) {
@@ -210,7 +145,7 @@ export async function forgotPassword(data: { email: string; ip?: string }) {
   const user = await prisma.user.findUnique({ where: { email: data.email } });
   if (!user) return false;
 
-  await sendOTP(user, 'EMAIL');
+  limiter.schedule(() => sendOTP(user));
 
   await prisma.auditLog.create({
     data: { userId: user.id, action: 'FORGOT_PASSWORD_CODE', ip: data.ip },
@@ -302,14 +237,4 @@ export async function logout(refreshTokenRaw?: string, ip?: string) {
   const hash = hashToken(refreshTokenRaw);
   await prisma.refreshToken.deleteMany({ where: { tokenHash: hash } });
   // audit log optional
-}
-
-export async function validateBVN(bvn: string) {
-  const bvnHash = hashToken(bvn);
-
-  const existing = await prisma.user.findFirst({
-    where: { bvn: bvnHash },
-  });
-
-  return !!existing;
 }

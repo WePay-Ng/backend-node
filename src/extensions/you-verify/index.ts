@@ -1,6 +1,6 @@
 import { environment } from '@/config/env';
 import { UVerifyBVN } from '@/types/types';
-import { generateRandom8DigitNumber, useErrorParser } from '@/utils';
+import { generateRandomNumber, useErrorParser } from '@/utils';
 import CustomError from '@/utils/customError';
 import axios from 'axios';
 
@@ -15,13 +15,13 @@ export class Youverify {
   static async verifyBVN(data: UVerifyBVN) {
     try {
       // For testing purposes
-      if (data.id === '22222222222')
+      if (['22222222222', '95888168924'].includes(data.id))
         return {
-          firstName: 'Wepay',
-          lastName: 'Demo',
+          firstName: 'Bunch',
+          lastName: 'Dillon',
           dateOfBirth: '12-12-1994',
           country: 'NG',
-          phone: '080' + generateRandom8DigitNumber(),
+          mobile: '080' + generateRandomNumber(8),
           gender: 'Male',
         };
 

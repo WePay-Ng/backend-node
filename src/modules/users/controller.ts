@@ -12,6 +12,12 @@ import {
 import CustomError from '@/utils/customError';
 import { useErrorParser } from '@/utils';
 import { getUser } from '@/utils/getUser';
+import Bottleneck from 'bottleneck';
+
+const limiter = new Bottleneck({
+  maxConcurrent: 1,
+  minTime: 333,
+});
 
 export class Controller {
   static async setCredentials(req: Request, res: Response) {
@@ -44,6 +50,30 @@ export class Controller {
       if (error) throw new Error(error.details[0].message);
 
       const user = await userService.update(id, value);
+
+      if (value?.email && !user.embedlyCustomerId) {
+        const data = {
+          address: user?.address?.streetLine,
+          city: user?.address?.city,
+          country: user?.address?.country,
+          dob: user?.dob,
+          firstName: user?.name?.split(' ')[0],
+          lastName: user?.name?.split(' ')[1],
+          mobileNumber: user?.phone,
+          middleName: user?.name?.split(' ')[1],
+        };
+
+        limiter.schedule(() =>
+          userService.createEmbedlyUser(user.id, {
+            embedly: data,
+            email: value.email,
+            bvn: user?.bvn!,
+          }),
+        );
+      }
+
+      if (user.bvn && user.bvn.length === 11 && user.role.includes('USER'))
+        limiter.schedule(() => userService.hashBVN(id, user.bvn!));
 
       return res.status(200).json({
         message: 'User updated successfully',

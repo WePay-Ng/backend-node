@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as authService from './auth.service';
+import * as userService from '../users/service';
 import { prisma } from '../../prisma/client';
 import {
   ValidateForgotPassword,
@@ -10,10 +11,14 @@ import {
   ValidateResetPin,
 } from './validator';
 import CustomError from '@/utils/customError';
-import { toISODate, useErrorParser } from '@/utils';
+import { useErrorParser } from '@/utils';
 import { getUser } from '@/utils/getUser';
-import { Youverify } from '@/extensions/you-verify';
-import { Embedly } from '@/extensions/embedly';
+import Bottleneck from 'bottleneck';
+
+const limiter = new Bottleneck({
+  maxConcurrent: 1,
+  minTime: 333,
+});
 
 export class AuthController {
   static async register(req: Request, res: Response) {
@@ -21,40 +26,24 @@ export class AuthController {
       const { error, value } = ValidateRegister().validate(req.body);
       if (error) throw new CustomError(error.details[0].message, 422);
 
-      const exist = await authService.validateBVN(value.bvn);
+      const exist = await userService.validateBVN(value.bvn);
       if (exist) throw new Error('BVN already in use');
 
-      const data: any = await Youverify.verifyBVN({
-        id: value.bvn,
-        isSubjectConsent: true,
-      });
-
-      const payload = {
-        ...value,
-        extra: {
-          name: data?.firstName + ' ' + data?.lastName,
-          dob: toISODate(data?.dateOfBirth),
-          country: data?.country,
-          gender: data?.gender,
-          phone: data?.phone,
-        },
-      };
-
+      const payload = await userService.getBVNData(value);
       const user = await authService.register(payload);
 
-      // TODO: Move to background
-      // const data = await Embedly.customers.personal({
-      //   address: '19 Prince Okey street',
-      //   city: 'Port harcourt',
-      //   country: 'NG', //exist.country!,
-      //   dob: '12-12-1994', //new Date(exist?.dob!).toDateString(),
-      //   emailAddress: 'test@test.com', //exist?.email! ??,
-      //   firstName: 'John', // exist.name?.split(' ')[0]!,
-      //   lastName: 'James', //exist?.name?.split(' ')[1]!,
-      //   mobileNumber: '08000000000', // exist?.phone!,
-      //   type: 'Individual',
-      //   middleName: 'N/A',
-      // });
+      // Create Embedly user and wallet
+      if (value?.email) {
+        limiter.schedule(
+          () =>
+            userService
+              .createEmbedlyUser(user.id, {
+                ...payload,
+                email: value.email,
+              })
+              .catch((error) => console.log(error)), // TODO: send to logs,
+        );
+      }
 
       return res.status(201).json({
         message: 'User created successfully',
@@ -198,7 +187,7 @@ export class AuthController {
         where: { userId: verification.userId },
       });
 
-      const user = await authService.update(id, { emailVerified: true });
+      const user = await userService.update(id, { emailVerified: true });
 
       return res.status(200).json({
         msg: 'Verify Successful',
