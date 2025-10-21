@@ -87,7 +87,6 @@ export class Controller {
         data: wallet,
       });
     } catch (error: any) {
-      console.log(error);
       const e = useErrorParser(error);
       return res.status(e.status).json(e);
     }

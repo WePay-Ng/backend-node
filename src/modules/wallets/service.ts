@@ -120,8 +120,6 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
       remarks: reason,
     });
 
-    console.log(result, 'RESULT');
-
     // Update transfer if immediate success
     if (result.statusCode === '200') {
       await prisma.transfer.update({
