@@ -10,7 +10,7 @@ import {
   ValidateOTP,
 } from './validator';
 import CustomError from '@/utils/customError';
-import { useErrorParser } from '@/utils';
+import { toISODate, useErrorParser } from '@/utils';
 import { getUser } from '@/utils/getUser';
 import Bottleneck from 'bottleneck';
 
@@ -18,6 +18,9 @@ const limiter = new Bottleneck({
   maxConcurrent: 1,
   minTime: 333,
 });
+
+// Apply to this job
+// https://harakaxyz.notion.site/job-senior-backend-eng
 
 export class Controller {
   static async setCredentials(req: Request, res: Response) {
@@ -56,24 +59,23 @@ export class Controller {
           address: user?.address?.streetLine,
           city: user?.address?.city,
           country: user?.address?.country,
-          dob: user?.dob,
+          dob: toISODate(user?.dob!),
           firstName: user?.name?.split(' ')[0],
           lastName: user?.name?.split(' ')[1],
-          mobileNumber: user?.phone,
+          phone: user?.phone,
           middleName: user?.name?.split(' ')[1],
         };
 
         limiter.schedule(() =>
-          userService.createEmbedlyUser(user.id, {
-            embedly: data,
-            email: value.email,
-            bvn: user?.bvn!,
-          }),
+          userService
+            .createEmbedlyUser(user.id, {
+              embedly: data,
+              email: value.email,
+              bvn: user?.bvn?.trim()!,
+            })
+            .catch((e) => console.log(e)),
         );
       }
-
-      if (user.bvn && user.bvn.length === 11 && user.role.includes('USER'))
-        limiter.schedule(() => userService.hashBVN(id, user.bvn!));
 
       return res.status(200).json({
         message: 'User updated successfully',
@@ -82,6 +84,10 @@ export class Controller {
       });
     } catch (error: any) {
       const e = useErrorParser(error);
+
+      if (e.message.includes('(`email`)'))
+        return res.status(e.status).json({ message: 'Email already exist' });
+
       return res.status(e.status).json(e);
     }
   }
@@ -94,12 +100,17 @@ export class Controller {
       const { error, value } = ValidatePin().validate(req.body);
       if (error) throw new Error(error.details[0].message);
 
-      const user = await userService.createPin(ID, value);
+      const user = await prisma.user.findUnique({
+        where: { id: ID },
+      });
+      if (!user) throw new CustomError('User not found', 500);
+
+      const updatedUser = await userService.createPin(ID, value);
 
       return res.status(200).json({
         message: 'User pin added successfully',
         success: true,
-        data: user,
+        data: updatedUser,
       });
     } catch (error: any) {
       const e = useErrorParser(error);

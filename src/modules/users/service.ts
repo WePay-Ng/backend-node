@@ -115,7 +115,7 @@ export async function addPassword(id: string, password: string) {
 }
 
 export async function hashBVN(id: string, bvn: string) {
-  if (bvn !== undefined) throw new CustomError('Bvn is required', 422);
+  if (bvn === undefined) throw new CustomError('Bvn is required', 422);
 
   const bvnHash = hashToken(bvn);
 
@@ -196,6 +196,7 @@ export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
 
   if (!verified) return;
 
+  await hashBVN(userId, data?.bvn!);
   const wallet = await createWallet({
     customerId: user?.embedlyCustomerId ?? embedly.id,
     currency: 'NGN',
