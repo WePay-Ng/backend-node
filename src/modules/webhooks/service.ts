@@ -3,7 +3,7 @@ import CustomError from '@/utils/customError';
 
 export async function inflow(payload: any) {
   const transfer = await prisma.transfer.findFirst({
-    where: { transactionReference: payload?.data.transactionReference },
+    where: { id: payload?.data.transactionReference },
   });
 
   if (payload?.success !== 'Success') {
@@ -24,7 +24,7 @@ export async function inflow(payload: any) {
 }
 export async function payout(payload: any) {
   const transfer = await prisma.transfer.findFirst({
-    where: { transactionReference: payload?.data.transactionReference },
+    where: { id: payload?.data.transactionReference },
   });
 
   if (payload?.data?.success !== 'Success') {

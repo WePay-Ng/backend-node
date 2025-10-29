@@ -64,7 +64,7 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
           initiatedBy: initiatorUserId,
           reason,
           status: 'PENDING',
-          transactionReference: result.data,
+          // transactionReference: result.data,
           shouldRefund: true,
           type: 'EXTERNAL',
         },
