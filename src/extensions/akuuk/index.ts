@@ -24,7 +24,7 @@ export class Akuuk {
 
     // Format phone number
     const number = Number(
-      `${country?.dial_code.split('+')[1]}${payload.number.toString().substring(0)}`,
+      `${country?.dial_code.split('+')[1]}${payload.number.toString().substring(1)}`,
     );
 
     console.log(number);
