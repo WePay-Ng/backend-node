@@ -236,18 +236,21 @@ model Wallet {
 }
 
 model Transfer {
-  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
-  idempotencyKey String?        @unique
-  fromWalletId   String         @db.Char(36)
-  toWalletId     String         @db.Char(36)
-  amount         BigInt
-  currency       String         @default("NGN")
-  status         TransferStatus @default(PENDING)
-  initiatedBy    String? // userId who initiated
-  reason         String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @default(now()) @updatedAt
-  ledgerEntries  Ledger[]       @relation("TransferLedger")
+  id                   String         @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  idempotencyKey       String?        @unique
+  fromWalletId         String         @db.Char(36)
+  toWalletId           String         @db.Char(36)
+  amount               BigInt
+  shouldRefund         Boolean        @default(true)
+  transactionReference String?
+  currency             String         @default("NGN")
+  status               TransferStatus @default(PENDING)
+  initiatedBy          String? // userId who initiated
+  reason               String?
+  type                 TransferType   @default(INTERNAL)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @default(now()) @updatedAt
+  ledgerEntries        Ledger[]       @relation("TransferLedger")
 
   @@index([fromWalletId])
   @@index([toWalletId])
@@ -331,4 +334,9 @@ enum UserRole {
   AGENT
   INSTITUTION
   MERCHANT
+}
+
+enum TransferType {
+  INTERNAL
+  EXTERNAL
 }

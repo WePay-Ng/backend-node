@@ -27,6 +27,8 @@ export class Akuuk {
       `${country?.dial_code.split('+')[1]}${payload.number.toString().substring(0)}`,
     );
 
+    console.log(number);
+
     if (!number) return;
 
     const res = await Client.post('/messaging/sms', {

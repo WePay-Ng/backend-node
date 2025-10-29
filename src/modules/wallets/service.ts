@@ -1,7 +1,6 @@
 import { Embedly } from '@/extensions/embedly';
 import { prisma } from '@/prisma/client';
 import { ExternalTransferInput, TransferPayload } from '@/types/types';
-import { lockWalletsTx } from '@/utils';
 import CustomError from '@/utils/customError';
 
 export async function transferToExternalBank(payload: ExternalTransferInput) {
@@ -39,75 +38,6 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
   if (Number(fromWallet.availableBalance) < amount)
     throw new CustomError('Insufficient balance', 422);
 
-  // ------------------------------
-  // 3️⃣ Start DB Transaction
-  // ------------------------------
-  const transferRecord = await prisma.$transaction(async (tx) => {
-    // 3.1 Create pending transfer
-    const transfer = await tx.transfer.create({
-      data: {
-        idempotencyKey,
-        fromWalletId: fromWallet.id,
-        toWalletId: fromWallet.id, // temporary, not external wallet
-        amount: BigInt(amount),
-        currency,
-        initiatedBy: initiatorUserId,
-        reason,
-        status: 'PENDING',
-      },
-    });
-
-    // 3.2 Debit user wallet
-    const newBalance = BigInt(fromWallet.availableBalance) - BigInt(amount);
-
-    await tx.wallet.update({
-      where: { id: fromWallet.id },
-      data: {
-        availableBalance: Number(newBalance),
-        ledgerBalance: Number(newBalance),
-      },
-    });
-
-    // 3.3 Create ledger entry (DEBIT)
-    await tx.ledger.create({
-      data: {
-        walletId: fromWallet.id,
-        transferId: transfer.id,
-        change: BigInt(-amount),
-        balanceAfter: newBalance,
-        type: 'TRANSFER_DEBIT',
-        metadata: {
-          reason,
-          toBankCode: destinationBank,
-          toAccount: destinationAccountNumber,
-        },
-      },
-    });
-
-    // 3.4 Create outbox for async publish
-    await tx.outboxEvent.create({
-      data: {
-        topic: 'transfer.external.initiated',
-        payload: {
-          transferId: transfer.id,
-          userId: initiatorUserId,
-          amount,
-          currency,
-          toBankCode: destinationBank,
-          toAccountNumber: destinationAccountNumber,
-          toAccountName: destinationAccountName,
-        },
-      },
-    });
-
-    return transfer;
-  });
-
-  if (!transferRecord) throw new CustomError('Transfer failed', 500);
-
-  // ------------------------------
-  // 4️⃣ Trigger External API (Embedly)
-  // ------------------------------
   try {
     const result = await Embedly.banks.transfer({
       amount,
@@ -115,61 +45,94 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
       destinationBank,
       destinationAccountNumber,
       destinationAccountName,
-      sourceAccountNumber: '9710006857', //fromWallet.accountNumber?.trim(),
-      sourceAccountName: 'Steve Jones', //senderName.trim() ?? 'Wepay User',
+      sourceAccountNumber: fromWallet.accountNumber?.trim(),
+      sourceAccountName: senderName.trim() ?? 'Wepay User',
       remarks: reason,
     });
 
-    // Update transfer if immediate success
-    if (result.statusCode === '200') {
-      await prisma.transfer.update({
-        where: { id: transferRecord.id },
-        data: { status: 'COMPLETED' },
-      });
+    if (!result.succeeded) throw new CustomError('Transfer not succeeded', 500);
 
-      await prisma.ledger.create({
+    const transferRecord = await prisma.$transaction(async (tx) => {
+      // 3.1 Create pending transfer
+      const transfer = await tx.transfer.create({
         data: {
-          walletId: fromWallet.id,
-          transferId: transferRecord.id,
-          change: BigInt(-amount),
-          balanceAfter: BigInt(fromWallet.availableBalance) - BigInt(amount),
-          type: 'FEE', // optional handling fees
-          metadata: { embedlyRef: result?.data?.reference },
+          idempotencyKey,
+          fromWalletId: fromWallet.id,
+          toWalletId: fromWallet.id, // temporary, not external wallet
+          amount: BigInt(amount),
+          currency,
+          initiatedBy: initiatorUserId,
+          reason,
+          status: 'PENDING',
+          transactionReference: result.data,
+          shouldRefund: true,
+          type: 'EXTERNAL',
         },
       });
-    }
+
+      // 3.2 Debit user wallet
+      const newBalance = BigInt(fromWallet.availableBalance) - BigInt(amount);
+      await tx.wallet.update({
+        where: { id: fromWallet.id },
+        data: {
+          availableBalance: Number(newBalance),
+        },
+      });
+
+      // 3.3 Create ledger entry (DEBIT)
+      await tx.ledger.create({
+        data: {
+          walletId: fromWallet.id,
+          transferId: transfer.id,
+          change: BigInt(-amount),
+          balanceAfter: newBalance,
+          type: 'TRANSFER_DEBIT',
+          metadata: {
+            reason,
+            toBankCode: destinationBank,
+            toAccount: destinationAccountNumber,
+          },
+        },
+      });
+
+      // 3.4 Create outbox for async publish
+      await tx.outboxEvent.create({
+        data: {
+          topic: 'transfer.external.initiated',
+          payload: {
+            transferId: transfer.id,
+            userId: initiatorUserId,
+            amount,
+            currency,
+            toBankCode: destinationBank,
+            toAccountNumber: destinationAccountNumber,
+            toAccountName: destinationAccountName,
+          },
+        },
+      });
+
+      return transfer;
+    });
+
+    if (!transferRecord) throw new CustomError('Transfer failed', 500);
+
+    return transferRecord;
   } catch (err) {
-    console.error('Embedly transfer error:', err);
-    await prisma.transfer.update({
-      where: { id: transferRecord.id },
-      data: { status: 'FAILED' },
-    });
-
-    // TODO:: Check if its the Transaction that fails
-    // Optionally refund
-    await prisma.wallet.update({
-      where: { id: fromWallet.id },
+    await prisma.transfer.create({
       data: {
-        availableBalance: { increment: amount },
-        ledgerBalance: { increment: amount },
-      },
-    });
-
-    await prisma.ledger.create({
-      data: {
-        walletId: fromWallet.id,
-        transferId: transferRecord.id,
-        change: BigInt(amount),
-        balanceAfter: BigInt(fromWallet.availableBalance),
-        type: 'ADJUSTMENT',
-        metadata: { reason: 'Refund - external transfer failed' },
+        status: 'FAILED',
+        idempotencyKey,
+        fromWalletId: fromWallet.id,
+        toWalletId: fromWallet.id, // temporary, not external wallet
+        amount: BigInt(amount),
+        currency,
+        initiatedBy: initiatorUserId,
+        reason,
       },
     });
 
     throw new CustomError('External transfer failed', 500);
   }
-
-  return transferRecord;
 }
 
 export async function walletToWalletTransfer(payload: TransferPayload) {
