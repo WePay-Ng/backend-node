@@ -10,7 +10,6 @@ import {
 } from '@/utils';
 import crypto from 'crypto';
 import { Corporate, Payment, Personal, Transfer, iWallet } from '@/types/types';
-import { Request, Response } from 'express';
 
 const Client = axios.create({
   baseURL: environment.embedly?.url ?? 'https://waas-staging.embedly.ng/api/v1',
@@ -41,19 +40,21 @@ const PayoutClient = axios.create({
 class Customer {
   static async personal(payload: Personal) {
     try {
-      const customerTypeId = findItem(types, 'Individual', 'name')?.id;
-      const eCountry = findItem(
+      const customerType = findItem(types, 'Individual', 'name');
+      const country = findItem(
         countries,
         payload.country,
         payload?.country?.length > 2 ? 'name' : 'countryCodeTwo',
       );
 
-      const { country, ...rest } = payload;
+      const { country: c, ...rest } = payload;
+
+      console.log(customerType, country);
 
       const data = {
         ...rest,
-        customerTypeId,
-        countryId: eCountry?.id,
+        customerTypeId: customerType?.id,
+        countryId: country?.id,
       };
       const res = await Client.post('/customers/add', data);
       const { data: result } = res;

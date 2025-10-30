@@ -29,6 +29,12 @@ export async function update(
     embedlyCustomerId?: string;
   },
 ) {
+  const user = await prisma.user.findUnique({
+    where: { id },
+  });
+
+  if (!user) throw new CustomError('User not found', 200);
+
   return await prisma.$transaction(async (tx) => {
     // Base update
     const record: Record<string, unknown> = {};
