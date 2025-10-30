@@ -106,7 +106,9 @@ export function toISODate(input: string | number | Date): string | null {
 }
 
 export function findItem(data: Array<any>, item: string, field: string) {
-  return data.find((d) => d[field] === item);
+  return data.find(
+    (d) => d[field].toLowerCase().trim() === item.toLowerCase().trim(),
+  );
 }
 
 /**

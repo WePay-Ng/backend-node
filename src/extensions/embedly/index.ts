@@ -49,7 +49,7 @@ class Customer {
 
       const { country: c, ...rest } = payload;
 
-      console.log(customerType, country);
+      console.log(customerType, country, rest);
 
       const data = {
         ...rest,
