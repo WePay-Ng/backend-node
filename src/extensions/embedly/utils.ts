@@ -1,84 +1,114 @@
-export const types = [
-  {
-    id: '0ed8b99b-8097-4e49-bd4c-ff0410c57d27',
-    name: 'Corporate',
-  },
-  {
-    id: 'f671da57-e281-4b40-965f-a96f4205405e',
-    name: 'Individual',
-  },
-];
+import { environment } from '@/config/env';
 
-export const countries = [
-  {
-    id: '08dd5d6c-a9b4-452d-8872-4ada3d46b506',
-    name: 'United States',
-    countryCodeTwo: 'US',
-    countryCodeThree: 'USA',
-  },
-  {
-    id: '08dd7754-454d-4ab0-8ed1-5eed930ad067',
-    name: 'Ghana',
-    countryCodeTwo: 'GH',
-    countryCodeThree: 'GHA',
-  },
-  {
-    id: '08dd7764-e2ab-455e-8359-84809550f17c',
-    name: 'Togo',
-    countryCodeTwo: 'TG',
-    countryCodeThree: 'TGO',
-  },
-  {
-    id: '08dd782b-134c-4e7c-8726-4524b8e41fa8',
-    name: 'Brazil',
-    countryCodeTwo: 'BR',
-    countryCodeThree: 'BRA',
-  },
-  {
-    id: 'c15ad9ae-c4d7-4342-b70f-de5508627e3b',
-    name: 'Nigeria',
-    countryCodeTwo: 'NG',
-    countryCodeThree: 'NGA',
-  },
-];
+export const types = ['LOCAL', 'DEVELOP'].includes(environment.context)
+  ? [
+      {
+        id: '0ed8b99b-8097-4e49-bd4c-ff0410c57d27',
+        name: 'Corporate',
+      },
+      {
+        id: 'f671da57-e281-4b40-965f-a96f4205405e',
+        name: 'Individual',
+      },
+    ]
+  : [
+      {
+        id: '46e68cf6-f355-4536-ae96-adf24682809f',
+        name: 'Corporate',
+      },
+      {
+        id: 'c92d5158-a4c5-4418-83f7-a813d3989a85',
+        name: 'Individual',
+      },
+    ];
 
-export const currencies = [
-  {
-    id: '6eeb54c8-24d7-11f0-a818-6045bd97b81d',
-    name: 'Canadian Dollars4',
-    shortName: 'CD4',
-  },
-  {
-    id: '82647b29-1302-11f0-a8a9-6045bd97b81d',
-    name: 'RAND',
-    shortName: 'ZAR',
-  },
-  {
-    id: '98d64583-fb7e-11ef-a8a9-6045bd97b81d',
-    name: 'Canadian Dollars',
-    shortName: 'CAD',
-  },
-  {
-    id: 'af8c9168-fdc5-11ef-a8a9-6045bd97b81d',
-    name: 'Canadian Dollars3',
-    shortName: 'CD3',
-  },
-  {
-    id: 'c8fe419f-fb7e-11ef-a8a9-6045bd97b81d',
-    name: 'Canadian Dollars2',
-    shortName: 'CD2',
-  },
-  {
-    id: 'd98ba5ab-fb78-11ef-a8a9-6045bd97b81d',
-    name: 'Tanzania Shillings',
-    shortName: 'TZS',
-  },
-  {
-    id: 'fd5e474d-bb42-4db1-ab74-e8d2a01047e9',
-    name: 'Nigeria Naira',
-    shortName: 'NGN',
-  },
-];
+export const countries = ['LOCAL', 'DEVELOP'].includes(environment.context)
+  ? [
+      {
+        id: '08dd5d6c-a9b4-452d-8872-4ada3d46b506',
+        name: 'United States',
+        countryCodeTwo: 'US',
+        countryCodeThree: 'USA',
+      },
+      {
+        id: '08dd7754-454d-4ab0-8ed1-5eed930ad067',
+        name: 'Ghana',
+        countryCodeTwo: 'GH',
+        countryCodeThree: 'GHA',
+      },
+      {
+        id: '08dd7764-e2ab-455e-8359-84809550f17c',
+        name: 'Togo',
+        countryCodeTwo: 'TG',
+        countryCodeThree: 'TGO',
+      },
+      {
+        id: '08dd782b-134c-4e7c-8726-4524b8e41fa8',
+        name: 'Brazil',
+        countryCodeTwo: 'BR',
+        countryCodeThree: 'BRA',
+      },
+      {
+        id: 'c15ad9ae-c4d7-4342-b70f-de5508627e3b',
+        name: 'Nigeria',
+        countryCodeTwo: 'NG',
+        countryCodeThree: 'NGA',
+      },
+    ]
+  : [
+      {
+        id: '4aa9d59e-04e7-4984-9794-85a55489d433',
+        name: 'Nigeria',
+        countryCodeTwo: 'NG',
+        countryCodeThree: 'NGA',
+      },
+    ];
+
+export const currencies = ['LOCAL', 'DEVELOP'].includes(environment.context)
+  ? [
+      {
+        id: '6eeb54c8-24d7-11f0-a818-6045bd97b81d',
+        name: 'Canadian Dollars4',
+        shortName: 'CD4',
+      },
+      {
+        id: '82647b29-1302-11f0-a8a9-6045bd97b81d',
+        name: 'RAND',
+        shortName: 'ZAR',
+      },
+      {
+        id: '98d64583-fb7e-11ef-a8a9-6045bd97b81d',
+        name: 'Canadian Dollars',
+        shortName: 'CAD',
+      },
+      {
+        id: 'af8c9168-fdc5-11ef-a8a9-6045bd97b81d',
+        name: 'Canadian Dollars3',
+        shortName: 'CD3',
+      },
+      {
+        id: 'c8fe419f-fb7e-11ef-a8a9-6045bd97b81d',
+        name: 'Canadian Dollars2',
+        shortName: 'CD2',
+      },
+      {
+        id: 'd98ba5ab-fb78-11ef-a8a9-6045bd97b81d',
+        name: 'Tanzania Shillings',
+        shortName: 'TZS',
+      },
+      {
+        id: 'fd5e474d-bb42-4db1-ab74-e8d2a01047e9',
+        name: 'Nigeria Naira',
+        shortName: 'NGN',
+      },
+    ]
+  : [
+      {
+        id: '45852f0c-84fa-410c-b66c-1ffec56e5cd8',
+        name: 'Nigeria Naira',
+        shortName: 'NGN',
+      },
+    ];
 
 export const banks = [
   {
