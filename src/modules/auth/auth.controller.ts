@@ -32,6 +32,8 @@ export class AuthController {
       const payload = await userService.getBVNData(value);
       const user = await authService.register(payload);
 
+      console.log(user);
+
       // Create Embedly user and wallet
       if (value?.email) {
         limiter.schedule(
@@ -41,7 +43,7 @@ export class AuthController {
                 ...payload,
                 email: value.email,
               })
-              .catch((error) => console.log(error)), // TODO: send to logs,
+              .catch((error) => console.log(error, 'EMBEDLY')), // TODO: send to logs,
         );
       }
 
@@ -52,6 +54,7 @@ export class AuthController {
         data: user,
       });
     } catch (error: any) {
+      console.log(error, 'REGISTER');
       const e = useErrorParser(error);
       if (e.message.includes('phone'))
         return res.status(e.status).json({

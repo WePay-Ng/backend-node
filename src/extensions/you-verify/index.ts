@@ -28,8 +28,6 @@ export class Youverify {
       const res = await Client.post('/v2/api/identity/ng/bvn', data);
       const { data: result } = res;
 
-      console.log(res);
-
       if (result.data && result.data?.status?.includes('not_found'))
         throw new CustomError(result.data.reason, 404);
 
