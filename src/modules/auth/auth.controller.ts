@@ -30,10 +30,10 @@ export class AuthController {
       if (exist) throw new Error('BVN already in use');
 
       const payload = await userService.getBVNData(value);
-      console.log(payload, 'PAYLOAD');
+      // console.log(payload, 'PAYLOAD');
       const user = await authService.register(payload);
 
-      console.log(user, 'USER');
+      // console.log(user, 'USER');
 
       // Create Embedly user and wallet
       if (value?.email) {
@@ -57,12 +57,12 @@ export class AuthController {
     } catch (error: any) {
       console.log(error, 'REGISTER');
       const e = useErrorParser(error);
-      if (e.message.includes('phone'))
+      if (e.message.includes('`phone`'))
         return res.status(e.status).json({
           message: 'Phone number already in use',
         });
 
-      if (e.message.includes('email'))
+      if (e.message.includes('`email`'))
         return res.status(e.status).json({
           message: 'Email already in use',
         });

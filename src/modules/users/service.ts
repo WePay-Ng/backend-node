@@ -216,7 +216,10 @@ export async function getBVNData(value: BVNInput) {
   const data = await Youverify.verifyBVN({
     id: value.bvn,
     isSubjectConsent: true,
+    premiumBVN: true,
   });
+
+  console.log(data, 'YOUVERIFY');
 
   return {
     ...value,

@@ -146,6 +146,7 @@ export interface SelectTemplate {
 
 export type UVerifyBVN = {
   id: string;
+  premiumBVN: boolean;
   isSubjectConsent: boolean;
   lastName?: string;
   firstName?: string;
