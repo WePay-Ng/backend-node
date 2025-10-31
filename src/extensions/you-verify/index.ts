@@ -28,12 +28,13 @@ export class Youverify {
       const res = await Client.post('/v2/api/identity/ng/bvn', data);
       const { data: result } = res;
 
+      console.log(result?.address, 'ADDRESS');
+
       if (result.data && result.data?.status?.includes('not_found'))
         throw new CustomError(result.data.reason, 404);
 
       if (result.data) return result.data;
     } catch (error) {
-      console.log(error);
       const res = error?.response?.data;
       if (res && !res.success)
         throw new CustomError(res.message, res.statusCode);
