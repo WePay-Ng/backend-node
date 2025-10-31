@@ -30,9 +30,10 @@ export class AuthController {
       if (exist) throw new Error('BVN already in use');
 
       const payload = await userService.getBVNData(value);
+      console.log(payload, 'PAYLOAD');
       const user = await authService.register(payload);
 
-      console.log(user);
+      console.log(user, 'USER');
 
       // Create Embedly user and wallet
       if (value?.email) {
