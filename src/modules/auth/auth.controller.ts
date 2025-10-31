@@ -51,7 +51,6 @@ export class AuthController {
         data: user,
       });
     } catch (error: any) {
-      console.log(error, 'REGISTER');
       const e = useErrorParser(error);
       if (e.message.includes('`phone`'))
         return res.status(e.status).json({
