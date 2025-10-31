@@ -28,8 +28,6 @@ export class Youverify {
       const res = await Client.post('/v2/api/identity/ng/bvn', data);
       const { data: result } = res;
 
-      console.log(result?.address, 'ADDRESS');
-
       if (result.data && result.data?.status?.includes('not_found'))
         throw new CustomError(result.data.reason, 404);
 
@@ -41,6 +39,27 @@ export class Youverify {
 
       const e = useErrorParser(error);
       throw new CustomError(e?.message, e.status);
+    }
+  }
+
+  static async verifyAddress(phone: string) {
+    try {
+      const res = await axios.post(
+        'https://address.svc.youverify.co/v2/api/digital-addresses/lookup',
+        {
+          consent: true,
+          phone,
+        },
+        {
+          headers: {
+            token: environment.youverify?.key ?? '',
+          },
+        },
+      );
+      const { data } = res;
+      console.log(data);
+    } catch (error) {
+      console.log(error, 'ADDRESS Very');
     }
   }
 }

@@ -42,9 +42,6 @@ export async function register(data: Register) {
       create: {},
     };
 
-  if (data?.extra?.address)
-    record.address = { create: { ...data.extra?.address } };
-
   // hash bvn
   let bvnHash = hashToken(data.bvn);
   if (data.role === 'USER') bvnHash = data.bvn; //Hashing will come when user add emails

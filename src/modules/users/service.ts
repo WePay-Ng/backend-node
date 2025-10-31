@@ -219,8 +219,6 @@ export async function getBVNData(value: BVNInput) {
     premiumBVN: true,
   });
 
-  console.log(data, 'YOUVERIFY');
-
   return {
     ...value,
     extra: {
@@ -229,12 +227,6 @@ export async function getBVNData(value: BVNInput) {
       country: data?.country,
       gender: data?.gender,
       phone: data?.mobile,
-      address: {
-        streetLine: data?.address?.addressLine,
-        city: data?.address?.town,
-        state: data?.address?.state,
-        country: data?.country,
-      },
     },
     embedly: {
       dob: toISODate(data?.dateOfBirth),

@@ -66,15 +66,13 @@ export class Controller {
           middleName: user?.name?.split(' ')[1],
         };
 
-        limiter.schedule(() =>
-          userService
-            .createEmbedlyUser(user.id, {
-              embedly: data,
-              email: value.email,
-              bvn: user?.bvn?.trim()!,
-            })
-            .catch((e) => console.log(e)),
-        );
+        // limiter.schedule(() =>
+        await userService.createEmbedlyUser(user.id, {
+          embedly: data,
+          email: value.email,
+          bvn: user?.bvn?.trim()!,
+        });
+        // );
       }
 
       return res.status(200).json({

@@ -35,15 +35,13 @@ export class AuthController {
 
       // Create Embedly user and wallet
       if (value?.email) {
-        limiter.schedule(
-          () =>
-            userService
-              .createEmbedlyUser(user.id, {
-                ...payload,
-                email: value.email,
-              })
-              .catch((error) => console.log(error, 'EMBEDLY')), // TODO: send to logs,
-        );
+        // limiter.schedule(
+        //   () =>
+        await userService.createEmbedlyUser(user.id, {
+          ...payload,
+          email: value.email,
+        });
+        // );
       }
 
       return res.status(201).json({
