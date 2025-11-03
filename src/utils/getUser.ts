@@ -10,6 +10,7 @@ export const getUser = async (user: any) => {
       merchant: true,
       agent: true,
       wallets: true,
+      address: true,
     },
   });
 

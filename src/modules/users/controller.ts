@@ -63,7 +63,7 @@ export class Controller {
           firstName: user?.name?.split(' ')[0],
           lastName: user?.name?.split(' ')[1],
           phone: user?.phone,
-          middleName: user?.name?.split(' ')[1],
+          middleName: user?.name?.split(' ')?.[2] ?? '',
         };
 
         // limiter.schedule(() =>
@@ -221,7 +221,7 @@ export class Controller {
 
       return res.status(200).json({
         msg: 'Logged in Successful',
-        data: user,
+        data: await getUser(user),
         success: true,
       });
     } catch (error) {
