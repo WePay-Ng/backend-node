@@ -33,16 +33,16 @@ export class AuthController {
 
       const user = await authService.register(payload);
 
-      // Create Embedly user and wallet
-      if (value?.email) {
-        // limiter.schedule(
-        //   () =>
-        await userService.createEmbedlyUser(user.id, {
-          ...payload,
-          email: value.email,
-        });
-        // );
-      }
+      // Wallet should only be created when the update with proper address
+      // if (value?.email) {
+      //   // limiter.schedule(
+      //   //   () =>
+      //   await userService.createEmbedlyUser(user.id, {
+      //     ...payload,
+      //     email: value.email,
+      //   });
+      //   // );
+      // }
 
       return res.status(201).json({
         message: 'User created successfully',
@@ -172,7 +172,7 @@ export class AuthController {
       const id = req.params.id;
 
       const record: Record<string, unknown> = {};
-      if (isDev() && code !== '222222') record.refreshCode = code;
+      if (!isDev() && code !== '222222') record.refreshCode = code;
 
       const verification = await prisma.verificationIntent.findFirst({
         where: { userId: id, ...record },
@@ -192,6 +192,21 @@ export class AuthController {
       return res.status(200).json({
         msg: 'Verify Successful',
         data: await getUser(user),
+        success: true,
+      });
+    } catch (error) {
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
+    }
+  }
+
+  static async resendOTP(req: Request, res: Response) {
+    try {
+      const id = req.params.id;
+      await authService.resendOTP(id);
+
+      return res.status(200).json({
+        msg: 'OTP Sent Successful',
         success: true,
       });
     } catch (error) {

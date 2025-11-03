@@ -10,6 +10,7 @@ router.post('/password/forgot', AuthController.forgotPassword);
 router.post('/password/reset', AuthController.resetPassword);
 router.put('/:id/verify', AuthController.verifyOTP);
 router.patch('/:id/verify', AuthController.verifyOTP);
+router.post('/:id/otp', AuthController.resendOTP);
 router.post('/pin/forgot', AuthController.forgotPin);
 router.put('/pin/reset', AuthController.resetPin);
 // Forget Pin

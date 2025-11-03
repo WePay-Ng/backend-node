@@ -6,9 +6,10 @@ import { signAccessToken } from '../../utils/jwt';
 import { addDays } from 'date-fns';
 import { Login, Register, ResetPassword } from '../../types/types';
 import { getUser } from '@/utils/getUser';
-import { sendOTP } from '@/utils';
 import { User } from '@prisma/client';
 import Bottleneck from 'bottleneck';
+import { sendOTP } from '@/utils';
+import CustomError from '@/utils/customError';
 
 const limiter = new Bottleneck({
   maxConcurrent: 1,
@@ -237,4 +238,16 @@ export async function logout(refreshTokenRaw?: string, ip?: string) {
   const hash = hashToken(refreshTokenRaw);
   await prisma.refreshToken.deleteMany({ where: { tokenHash: hash } });
   // audit log optional
+}
+
+export async function resendOTP(userId: string) {
+  const user = await prisma.user.findFirst({
+    where: { id: userId },
+  });
+
+  if (!user) throw new CustomError('User not found', 500);
+
+  limiter.schedule(() => sendOTP(user));
+
+  return true;
 }
