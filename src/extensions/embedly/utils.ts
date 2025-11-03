@@ -1368,3 +1368,13 @@ export const banks = [
     bankCode: '090275',
   },
 ];
+
+export function sanitizeAddress(address: string): string {
+  if (!address) return '';
+
+  const cleaned = address.replace(/[^a-zA-Z0-9\s,\-]/g, '');
+
+  const normalized = cleaned.replace(/\s+/g, ' ').trim();
+
+  return normalized;
+}

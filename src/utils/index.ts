@@ -78,6 +78,12 @@ export async function sendOTP(user: User) {
     }).catch((e) => console.log(e));
 }
 
+export function formatPhoneNumber(number: string | number, dailCode: string) {
+  return number.toString().length > 11
+    ? number
+    : Number(`${dailCode.split('+')[1]}${number.toString().substring(1)}`);
+}
+
 /**
  * Converts any valid date string, timestamp, or Date object
  * to a standard ISO 8601 date string.
@@ -107,7 +113,7 @@ export function toISODate(input: string | number | Date): string | null {
 
 export function findItem(data: Array<any>, item: string, field: string) {
   return data.find(
-    (d) => d[field].toLowerCase().trim() === item.toLowerCase().trim(),
+    (d) => d?.[field]?.toLowerCase()?.trim() === item?.toLowerCase()?.trim(),
   );
 }
 

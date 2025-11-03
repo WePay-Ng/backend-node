@@ -1,7 +1,7 @@
 import { environment } from '@/config/env';
 import CustomError from '@/utils/customError';
 import axios from 'axios';
-import { banks, countries, currencies, types } from './utils';
+import { banks, countries, currencies, sanitizeAddress, types } from './utils';
 import {
   findItem,
   generateRandomNumber,
@@ -47,12 +47,14 @@ class Customer {
         payload?.country?.length > 2 ? 'name' : 'countryCodeTwo',
       );
 
-      const { country: c, ...rest } = payload;
+      const { country: c, address, ...rest } = payload;
+      const sanitizedAddress = sanitizeAddress(address);
 
       const data = {
         ...rest,
         customerTypeId: customerType?.id,
         countryId: country?.id,
+        address: sanitizedAddress,
       };
       const res = await Client.post('/customers/add', data);
       const { data: result } = res;

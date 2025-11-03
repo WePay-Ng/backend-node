@@ -177,8 +177,8 @@ export async function verifyUserPin(
 
 export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
   const embedly = await Embedly.customers.personal({
-    address: data?.embedly?.address ?? '19 Prince Okey street',
-    city: data?.embedly?.city ?? 'Port harcourt',
+    address: data?.embedly?.address,
+    city: data?.embedly?.city,
     country: data?.embedly?.country,
     dob: data?.embedly?.dob,
     firstName: data?.embedly?.firstName,
@@ -190,25 +190,23 @@ export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
 
   if (!embedly) return;
 
-  const [user, verified] = await Promise.all([
-    update(userId, {
-      embedlyCustomerId: embedly?.id,
-    }),
+  const [verified, wallet] = await Promise.all([
     Embedly.customers.verifyKYC({
       bvn: data.bvn,
       customerId: embedly?.id,
     }),
+    createWallet({
+      customerId: embedly.id,
+      currency: 'NGN',
+    }),
+    update(userId, {
+      embedlyCustomerId: embedly?.id,
+    }),
   ]);
 
-  if (!verified) return;
+  if (!verified && !wallet) return;
 
   await hashBVN(userId, data?.bvn!);
-  const wallet = await createWallet({
-    customerId: user?.embedlyCustomerId ?? embedly.id,
-    currency: 'NGN',
-    name: user?.name!,
-  });
-
   return wallet;
 }
 
@@ -249,6 +247,7 @@ export async function createWallet(payload: iWallet) {
   if (!user) throw new CustomError('Customer not found on embedly', 500);
 
   const result = await Embedly.wallets.create(payload);
+  if (!result) throw new CustomError('Wallet not creted on embedly', 500);
 
   // Create user wallet
   const userWallet = await prisma.wallet.create({

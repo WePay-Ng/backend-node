@@ -31,7 +31,7 @@ export function ValidateUpdateUser() {
       streetLine: Joi.string().required(),
       office_address: Joi.string().optional(),
       landmark: Joi.string().optional(),
-    }).optional(),
+    }).required(),
     bank: Joi.object({
       name: Joi.string().required(),
       accountName: Joi.string().required(),
