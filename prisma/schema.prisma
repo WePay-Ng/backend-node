@@ -46,6 +46,7 @@ model User {
   verifications          Verification[]       @relation("VerificationUser")
   intitutionId           String?              @db.Char(36)
   wallets                Wallet[]             @relation("WalletUser")
+  Airtime                Airtime[]
 }
 
 model Agent {
@@ -204,6 +205,55 @@ model IdempotencyKey {
   createdAt    DateTime  @default(now())
 }
 
+model Airtime {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  idempotencyKey String?       @unique
+  userId         String        @db.Char(36)
+  walletId       String        @db.Char(36)
+  provider       String // "AKUUK"
+  phoneNumber    String
+  network        String // e.g., "MTN", "AIRTEL"
+  amount         BigInt // in kobo
+  currency       String        @default("NGN")
+  status         AirtimeStatus @default(PENDING)
+  error          String?
+  reference      String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @default(now()) @updatedAt
+
+  // relations
+  ledgerEntryId String? @db.Char(36)
+  ledgerEntry   Ledger? @relation(fields: [ledgerEntryId], references: [id])
+  user          User    @relation(fields: [userId], references: [id])
+  wallet        Wallet  @relation(fields: [walletId], references: [id])
+  Fee           Fee[]
+}
+
+model Fee {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  transactionId String   @db.Char(36)
+  provider      String?  @db.Char(36)
+  type          FeeType  @default(INTERNAL)
+  rate          Float
+  amount        Float
+  currency      String
+  status        String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+  transaction   Airtime  @relation(fields: [transactionId], references: [id])
+}
+
+model Provider {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  provider  String   @unique
+  balance   BigInt   @default(0)
+  metadata  Json?
+  total     Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  ledgers   Ledger[] @relation("ProviderLedger")
+}
+
 model VerificationIntent {
   id          String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
   user        User                   @relation("UserVerificationIntent", fields: [userId], references: [id])
@@ -216,20 +266,21 @@ model VerificationIntent {
 }
 
 model Wallet {
-  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
-  userId           String   @db.Char(36)
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  userId           String    @db.Char(36)
   walletId         String
-  bankName         String   @db.Char(20)
-  bankCode         String   @db.Char(3)
-  accountNumber    String   @db.Char(10)
-  availableBalance BigInt   @default(0)
-  ledgerBalance    BigInt   @default(0)
-  reservedBalance  BigInt   @default(0) // funds reserved for pending transfers
-  version          Int      @default(1) // optimistic version / CAS
-  ledgerEntries    Ledger[] @relation("WalletLedger")
-  user             User?    @relation("WalletUser", fields: [userId], references: [id])
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @default(now()) @updatedAt
+  bankName         String    @db.Char(20)
+  bankCode         String    @db.Char(3)
+  accountNumber    String    @db.Char(10)
+  availableBalance BigInt    @default(0)
+  ledgerBalance    BigInt    @default(0)
+  reservedBalance  BigInt    @default(0) // funds reserved for pending transfers
+  version          Int       @default(1) // optimistic version / CAS
+  ledgerEntries    Ledger[]  @relation("WalletLedger")
+  user             User?     @relation("WalletUser", fields: [userId], references: [id])
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
+  Airtime          Airtime[]
 
   @@unique([walletId])
   @@index([userId])
@@ -259,7 +310,8 @@ model Transfer {
 
 model Ledger {
   id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
-  walletId     String        @db.Char(36)
+  walletId     String?       @db.Char(36)
+  providerId   String?       @db.Char(36)
   transferId   String?       @db.Char(36)
   journalId    String?       @db.Char(36) // groups ledger rows for double-entry
   change       BigInt // negative for debit, positive for credit
@@ -268,8 +320,10 @@ model Ledger {
   metadata     Json?
   createdAt    DateTime      @default(now())
   journal      JournalEntry? @relation("JournalLedgers", fields: [journalId], references: [id])
-  wallet       Wallet        @relation("WalletLedger", fields: [walletId], references: [id])
+  wallet       Wallet?       @relation("WalletLedger", fields: [walletId], references: [id])
+  provider     Provider?     @relation("ProviderLedger", fields: [providerId], references: [id])
   transfer     Transfer?     @relation("TransferLedger", fields: [transferId], references: [id])
+  airtimes     Airtime[]
 
   @@index([walletId])
   @@index([journalId])
@@ -339,4 +393,18 @@ enum UserRole {
 enum TransferType {
   INTERNAL
   EXTERNAL
+}
+
+enum AirtimeStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum FeeType {
+  INTERNAL
+  DATA
+  EXTERNAL
+  AIRTIME
 }

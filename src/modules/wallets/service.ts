@@ -146,6 +146,8 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
     reason,
   } = payload;
 
+  // TODO:: Check for user wallet amount before transfering
+
   const amt = BigInt(amount);
   if (amt <= 0n) throw new Error('Amount must be positive');
 

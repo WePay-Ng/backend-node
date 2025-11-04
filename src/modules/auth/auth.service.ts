@@ -99,15 +99,17 @@ export async function forgotPin(payload: {
 export async function login(data: Login) {
   const user = await prisma.user.findUnique({ where: { phone: data.phone } });
   if (!user) throw new Error('Invalid credentials');
-
   // account lockout
+
+  if (!user.pin) throw new CustomError('User has no pin', 500);
   const ok = await verifyPin(user.pin!, data.pin);
+
   if (!ok) {
     // increment failed attempts if you have fields; for now just log and throw
     await prisma.auditLog.create({
       data: { userId: user.id, action: 'FAILED_LOGIN' },
     });
-    throw new Error('Invalid credentials');
+    throw new CustomError('Invalid credentials', 500);
   }
 
   // success: issue tokens
