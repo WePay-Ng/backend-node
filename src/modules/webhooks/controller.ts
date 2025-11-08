@@ -9,7 +9,8 @@ export class Controller {
   static async handleTransfers(req: Request, res: Response) {
     try {
       const signature = req.headers['x-embedly-signature'];
-      const rawBody = req.body.toString('utf8');
+      const body = req.body;
+      const rawBody = body?.toString('utf8');
 
       console.log(rawBody, 'RAW BODY');
 
