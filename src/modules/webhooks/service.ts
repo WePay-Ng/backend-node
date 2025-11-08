@@ -43,7 +43,8 @@ export async function payout(payload: any) {
       where: { accountNumber: payload?.accountNumber },
     });
 
-    const newToLedgerBal = Number(wallet?.availableBalance) - payload.amount;
+    const newToLedgerBal =
+      BigInt(wallet?.availableBalance as any) - BigInt(payload.amount);
 
     // TODO: Create a Journal Entry and Ledger debit for the momey leaving
 
@@ -202,9 +203,11 @@ export async function inflow(payload: any) {
         type: 'EXTERNAL',
         reason: payload.description,
         status: 'COMPLETED',
+        completedAt: new Date().toISOString(),
         metadata: {
           timestamp: new Date().toISOString(),
           type: 'INFLOW',
+          completedAt: new Date().toISOString(),
         },
       },
     });
@@ -222,9 +225,10 @@ export async function inflow(payload: any) {
       },
     });
 
-    const newToLedgerBal = BigInt(wallet.ledgerBalance as any) + payload.amount;
+    const newToLedgerBal =
+      BigInt(wallet.ledgerBalance as any) + BigInt(payload.amount);
     const newToAvailable =
-      BigInt(wallet.availableBalance as any) + payload.amount;
+      BigInt(wallet.availableBalance as any) + BigInt(payload.amount);
 
     await tx.ledger.create({
       data: {

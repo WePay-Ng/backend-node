@@ -22,7 +22,7 @@ export class Controller {
         signature,
       );
 
-      console.log(isVerified, 'isVerified');
+      // console.log(isVerified, 'isVerified');
 
       if (!isVerified) throw new CustomError('Invalid signature', 401);
 
