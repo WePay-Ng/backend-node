@@ -6,6 +6,7 @@ import { Workers } from './Workers';
 const connection = {
   host: environment.redis.host,
   port: environment.redis.port,
+  password: environment.redis.password,
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
 };

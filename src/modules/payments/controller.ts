@@ -3,7 +3,6 @@ import { Request, Response } from 'express';
 import { ValidateAirtimePayment } from './validator';
 import * as PaymentService from './service';
 import { useErrorParser } from '@/utils';
-import { Akuuk } from '@/extensions/akuuk';
 
 export class Controller {
   static async airtime(req: Request, res: Response) {
