@@ -43,10 +43,10 @@ export async function payout(payload: any) {
       where: { accountNumber: payload?.accountNumber },
     });
 
-    const feeRate = Number(process.env.EXTERNAL_PERCENT) ?? 15;
-    const newToLedgerBal = Number(wallet?.availableBalance) - feeRate;
+    const newToLedgerBal = Number(wallet?.availableBalance) - payload.amount;
 
-    // create JournalEntry
+    // TODO: Create a Journal Entry and Ledger debit for the momey leaving
+
     const journal = await tx.journalEntry.create({
       data: {
         reference: payload.reference,
@@ -65,8 +65,68 @@ export async function payout(payload: any) {
         walletId: wallet?.id,
         journalId: journal.id,
         transferId: transfer.id,
-        change: feeRate,
+        change: -newToLedgerBal,
         balanceAfter: newToLedgerBal,
+        type: 'FEE',
+        metadata: {
+          reason: 'Commission on Nip',
+          fromWalletId: wallet?.id,
+          toProvider: 'EMBEDLY',
+        },
+      },
+    });
+
+    const updatedWallet = await prisma.wallet.update({
+      where: { id: wallet?.id },
+      data: {
+        ledgerBalance: newToLedgerBal,
+        availableBalance: newToLedgerBal,
+      },
+    });
+
+    // TODO:: NOTIFY USER
+
+    const feeRate = Number(process.env.EXTERNAL_PERCENT) ?? 15;
+    const newToLedgerBalAfterFee =
+      Number(updatedWallet?.availableBalance) - feeRate;
+
+    // create JournalEntry
+    const feeJournal = await tx.journalEntry.create({
+      data: {
+        reference: payload.reference,
+        transferId: updatedTransfer.id,
+        description: 'Commission on Nip',
+        metadata: {
+          fromWalletId: wallet?.id,
+          toProvider: 'EMBEDLY',
+        },
+      },
+    });
+
+    // Create Debit Ledger
+    await prisma.ledger.create({
+      data: {
+        walletId: wallet?.id,
+        journalId: feeJournal.id,
+        transferId: transfer.id,
+        change: -feeRate,
+        balanceAfter: newToLedgerBalAfterFee,
+        type: 'FEE',
+        metadata: {
+          reason: 'Commission on Nip',
+          fromWalletId: wallet?.id,
+          toProvider: 'EMBEDLY',
+        },
+      },
+    });
+
+    await prisma.ledger.create({
+      data: {
+        walletId: wallet?.id,
+        journalId: feeJournal.id,
+        transferId: transfer.id,
+        change: feeRate,
+        balanceAfter: newToLedgerBalAfterFee,
         type: 'FEE',
         metadata: {
           reason: 'Commission on Nip',
@@ -79,8 +139,8 @@ export async function payout(payload: any) {
     await prisma.wallet.update({
       where: { id: wallet?.id },
       data: {
-        ledgerBalance: { decrement: feeRate },
-        availableBalance: { decrement: feeRate },
+        ledgerBalance: newToLedgerBalAfterFee,
+        availableBalance: newToLedgerBalAfterFee,
       },
     });
 
@@ -96,6 +156,8 @@ export async function payout(payload: any) {
         type: 'EXTERNAL',
       },
     });
+
+    // TODO:: NOTIFY USER
 
     await tx.outboxEvent.create({
       data: {

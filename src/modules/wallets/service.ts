@@ -42,7 +42,10 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
   if (!fromUser) throw new CustomError('User not found', 404);
   if (!fromWallet) throw new CustomError('Wallet not found', 404);
 
-  if (Number(fromWallet.availableBalance) < amount)
+  const feeRate = Number(process.env.EXTERNAL_PERCENT) ?? 15;
+  const totalAmount = amount + feeRate;
+
+  if (Number(fromWallet.availableBalance) < totalAmount)
     throw new CustomError('Insufficient balance', 422);
 
   const transferRecord = await prisma.$transaction(async (tx) => {
