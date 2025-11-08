@@ -6,7 +6,9 @@ export async function payout(payload: any) {
     where: { transactionReference: payload.reference },
   });
 
-  if (!transfer) throw new CustomError("Transfer not found", 404)
+  console.log(transfer, 'TRANSFER');
+
+  if (!transfer) throw new CustomError('Transfer not found', 404);
 
   if (payload?.success !== 'Success') {
     await prisma.transfer.update({
@@ -21,7 +23,7 @@ export async function payout(payload: any) {
         payload: {
           transferId: transfer?.id,
           error: payload.message,
-          ...payload
+          ...payload,
         },
       },
     });
@@ -29,7 +31,7 @@ export async function payout(payload: any) {
     throw new CustomError(payload?.message, 500);
   }
 
-  const metadata = transfer.metadata as { provideId?: string }
+  const metadata = transfer.metadata as { provideId?: string };
 
   const transferRecord = await prisma.$transaction(async (tx) => {
     const updatedTransfer = await tx.transfer.update({
@@ -37,18 +39,63 @@ export async function payout(payload: any) {
       data: { status: 'COMPLETED' },
     });
 
+    const wallet = await prisma.wallet.findFirst({
+      where: { accountNumber: payload?.accountNumber },
+    });
+
+    const feeRate = Number(process.env.EXTERNAL_PERCENT) ?? 15;
+    const newToLedgerBal = Number(wallet?.availableBalance) - feeRate;
+
+    // create JournalEntry
+    const journal = await tx.journalEntry.create({
+      data: {
+        reference: payload.reference,
+        transferId: updatedTransfer.id,
+        description: 'Commission on Nip',
+        metadata: {
+          fromWalletId: wallet?.id,
+          toProvider: 'EMBEDLY',
+        },
+      },
+    });
+
+    // Create Debit Ledger
+    await prisma.ledger.create({
+      data: {
+        walletId: wallet?.id,
+        journalId: journal.id,
+        transferId: transfer.id,
+        change: feeRate,
+        balanceAfter: newToLedgerBal,
+        type: 'FEE',
+        metadata: {
+          reason: 'Commission on Nip',
+          fromWalletId: wallet?.id,
+          toProvider: 'EMBEDLY',
+        },
+      },
+    });
+
+    await prisma.wallet.update({
+      where: { id: wallet?.id },
+      data: {
+        ledgerBalance: { decrement: feeRate },
+        availableBalance: { decrement: feeRate },
+      },
+    });
+
     // Add Fee
     await tx.fee.create({
       data: {
         amount: payload.fee,
         currency: transfer.currency,
-        rate: Number(process.env.EXTERNAL_PERCENT) ?? 0.025,
-        status: "SUCCESS",
+        rate: Number(process.env.EXTERNAL_PERCENT) ?? 15,
+        status: 'SUCCESS',
         provider: metadata?.provideId,
         transactionId: updatedTransfer.id,
-        type: "EXTERNAL"
-      }
-    })
+        type: 'EXTERNAL',
+      },
+    });
 
     await tx.outboxEvent.create({
       data: {
@@ -56,45 +103,46 @@ export async function payout(payload: any) {
         topic: 'transfer.external.embedly.completed',
         payload: {
           transferId: transfer?.id,
-          ...payload
+          ...payload,
         },
       },
     });
 
-    return updatedTransfer
-  })
+    console.log(updatedTransfer, 'UPDATED TRANSFER');
+    return updatedTransfer;
+  });
 
   //TODO: Trigger Notifications
 
   return transferRecord;
 }
 
-
 export async function inflow(payload: any) {
   const wallet = await prisma.wallet.findFirst({
     where: { accountNumber: payload?.accountNumber },
   });
 
-  if (!wallet) throw new CustomError("Wallet not found", 404)
+  console.log(wallet, 'WALLET');
+
+  if (!wallet) throw new CustomError('Wallet not found', 404);
 
   const transfer = prisma.$transaction(async (tx) => {
-
-    const privider = await prisma.provider.findFirst({
-      where: { provider: "EMBEDLY" },
+    const provider = await prisma.provider.findFirst({
+      where: { provider: 'EMBEDLY' },
     });
 
     const transfer = await tx.transfer.create({
       data: {
-        provider: "EMBEDLY",
-        fromProviderId: privider?.id,
+        provider: 'EMBEDLY',
+        fromProviderId: provider?.id,
         amount: payload.amount,
-        currency: "NGN",
-        type: "EXTERNAL",
+        currency: 'NGN',
+        type: 'EXTERNAL',
         reason: payload.description,
         status: 'COMPLETED',
         metadata: {
           timestamp: new Date().toISOString(),
-          type: "INFLOW"
+          type: 'INFLOW',
         },
       },
     });
@@ -106,14 +154,15 @@ export async function inflow(payload: any) {
         transferId: transfer.id,
         description: payload.description,
         metadata: {
-          fromProviderId: privider?.id,
+          fromProviderId: provider?.id,
           toWalletId: wallet.id,
-        }
+        },
       },
     });
 
     const newToLedgerBal = BigInt(wallet.ledgerBalance as any) + payload.amount;
-    const newToAvailable = BigInt(wallet.availableBalance as any) + payload.amount;
+    const newToAvailable =
+      BigInt(wallet.availableBalance as any) + payload.amount;
 
     await tx.ledger.create({
       data: {
@@ -125,7 +174,7 @@ export async function inflow(payload: any) {
         type: 'TRANSFER_CREDIT',
         metadata: {
           reason: payload.description,
-          providerId: privider?.id,
+          providerId: provider?.id,
         },
       },
     });
@@ -138,10 +187,10 @@ export async function inflow(payload: any) {
         version: { increment: 1 },
       },
     });
-    return transfer
-  })
+    return transfer;
+  });
 
   //TODO: Trigger Notifications
 
-  return transfer
+  return transfer;
 }

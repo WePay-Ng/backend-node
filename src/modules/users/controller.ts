@@ -66,13 +66,12 @@ export class Controller {
           middleName: user?.name?.split(' ')?.[2] ?? '',
         };
 
-        // limiter.schedule(() =>
+        // TODO: Move this to a Queue
         await userService.createEmbedlyUser(user.id, {
           embedly: data,
           email: value.email,
           bvn: user?.bvn?.trim()!,
         });
-        // );
       }
 
       return res.status(200).json({

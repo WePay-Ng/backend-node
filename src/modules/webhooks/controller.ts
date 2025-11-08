@@ -3,13 +3,15 @@ import { Embedly } from '@/extensions/embedly';
 import CustomError from '@/utils/customError';
 import { useErrorParser } from '@/utils';
 import * as webhookService from './service';
-import { prisma } from "@/prisma/client";
+import { prisma } from '@/prisma/client';
 
 export class Controller {
   static async handleTransfers(req: Request, res: Response) {
     try {
       const signature = req.headers['x-embedly-signature'];
       const rawBody = req.body.toString('utf8');
+
+      console.log(rawBody, 'RAW BODY');
 
       if (!signature || !rawBody)
         throw new CustomError('Missing signature or body', 400);
@@ -19,10 +21,14 @@ export class Controller {
         signature,
       );
 
+      console.log(isVerified, 'isVerified');
+
       if (!isVerified) throw new CustomError('Invalid signature', 401);
 
       const result = req.body;
       let transfer = undefined;
+
+      console.log(result, 'RESULT');
 
       if (result.event === 'nip')
         transfer = await webhookService.inflow(result?.data);
@@ -30,14 +36,13 @@ export class Controller {
       if (result.event === 'payout')
         transfer = await webhookService.payout(result?.data);
 
-
       await prisma.outboxEvent.create({
         data: {
           aggregateId: transfer?.id,
           topic: 'transfer.external.completed',
           payload: {
             transferId: transfer?.id,
-            ...result?.data
+            ...result?.data,
           },
         },
       });

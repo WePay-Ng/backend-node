@@ -55,6 +55,14 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
     );
     if (limitExceeded) throw new CustomError(`Daily limit exceeded.`, 403);
 
+    const provider = await prisma.provider.upsert({
+      where: { provider: 'EMBEDLY' },
+      update: {},
+      create: {
+        provider: 'EMBEDLY',
+      },
+    });
+
     const transfer = await tx.transfer.create({
       data: {
         idempotencyKey,
@@ -67,6 +75,9 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
         status: 'PENDING',
         shouldRefund: true,
         type: 'EXTERNAL',
+        metadata: {
+          providerId: provider.id,
+        },
       },
     });
 
