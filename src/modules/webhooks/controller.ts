@@ -3,6 +3,7 @@ import { Embedly } from '@/extensions/embedly';
 import CustomError from '@/utils/customError';
 import { useErrorParser } from '@/utils';
 import * as webhookService from './service';
+import { prisma } from "@/prisma/client";
 
 export class Controller {
   static async handleTransfers(req: Request, res: Response) {
@@ -28,6 +29,18 @@ export class Controller {
 
       if (result.event === 'payout')
         transfer = await webhookService.payout(result?.data);
+
+
+      await prisma.outboxEvent.create({
+        data: {
+          aggregateId: transfer?.id,
+          topic: 'transfer.external.completed',
+          payload: {
+            transferId: transfer?.id,
+            ...result?.data
+          },
+        },
+      });
 
       return res.status(200).json({
         status: 'success',

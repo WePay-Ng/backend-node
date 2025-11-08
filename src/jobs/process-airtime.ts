@@ -1,6 +1,7 @@
 import { prisma } from '@/prisma/client';
 import { Akuuk } from '@/extensions/akuuk';
-import Bottleneck from "bottleneck";
+import Bottleneck from 'bottleneck';
+import { Queue } from './queues';
 
 const limiter = new Bottleneck({
   maxConcurrent: 1,
@@ -21,10 +22,10 @@ export async function processAirtimeEvent(eventId: any) {
     currency?: string;
     userId?: string;
     fromWalletId?: string;
-    country?: string
+    country?: string;
   };
 
-  let response: any = null
+  let response: any = null;
 
   try {
     response = await Akuuk.airtime({
@@ -36,11 +37,13 @@ export async function processAirtimeEvent(eventId: any) {
 
     await prisma.$transaction(async (tx) => {
       // mark tansaction completed
+
+      // TODO:: Check this again, it can pull any ledgerRow
       const ledgerRow = await tx.ledger.findFirst({
         where: { walletId: payload.fromWalletId },
       });
 
-      const rate = Number(process.env.AIRTIME_PERCENT) ?? 0.025
+      const rate = Number(process.env.AIRTIME_PERCENT) ?? 0.025;
       await tx.fee.create({
         data: {
           transactionId: payload?.airtimeId,
@@ -57,9 +60,9 @@ export async function processAirtimeEvent(eventId: any) {
         where: { id: payload.airtimeId },
         data: {
           status: 'SUCCESS' as any,
-          reference: response?.details?.txnReference + "",
+          reference: response?.details?.txnReference + '',
           ledgerEntryId: ledgerRow?.id,
-          network: response?.details?.network
+          network: response?.details?.network,
         },
       });
 
@@ -75,23 +78,23 @@ export async function processAirtimeEvent(eventId: any) {
             fromWalletId: payload.fromWalletId,
             amount: payload.amount,
             currency: response?.details?.currency ?? 'NGN',
-            competedAt: response?.details?.txnDate ?? new Date().toISOString()
+            competedAt: response?.details?.txnDate ?? new Date().toISOString(),
           },
         },
       });
     });
 
-    limiter.schedule(async () => {
-      const user = await prisma.user.findUnique({
-        where: { id: payload.userId }
-      })
-      await Akuuk.sendSMS({
-        country: 'NG',
-        message: 'Airtime purchase successful',
-        number: user?.phone!,
-      });
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+    });
 
-    })
+    if (!user) return response;
+    await Queue.trigger(eventId, 'NOTIFICATION', {
+      country: user?.country ?? 'NG',
+      message: `Airtime purchase successful`,
+      phone: user?.phone!,
+      type: 'SMS',
+    });
 
     return response;
   } catch (err) {
@@ -99,11 +102,25 @@ export async function processAirtimeEvent(eventId: any) {
       await prisma.airtime.update({
         where: { id: payload.airtimeId },
         data: {
-          status: 'SUCCESS' as any, reference: response?.details?.txnReference + '', network: response?.details?.network
+          status: 'SUCCESS' as any,
+          reference: response?.details?.txnReference + '',
+          network: response?.details?.network,
         },
       });
 
-      return
+      await prisma.outboxEvent.create({
+        data: {
+          aggregateId: eventId,
+          topic: 'airtime.purchase.akuuk.partial',
+          payload: {
+            airtimeId: payload.airtimeId,
+            userId: payload.userId,
+            error: err.message,
+          },
+        },
+      });
+
+      throw new Error(err);
     }
 
     await prisma.$transaction(async (tx) => {
@@ -131,7 +148,7 @@ export async function processAirtimeEvent(eventId: any) {
     await prisma.outboxEvent.create({
       data: {
         aggregateId: eventId,
-        topic: 'airtime.purchase.failed',
+        topic: 'airtime.purchase.akuuk.failed',
         payload: {
           airtimeId: payload.airtimeId,
           userId: payload.userId,
@@ -140,5 +157,6 @@ export async function processAirtimeEvent(eventId: any) {
       },
     });
     console.error('[AirtimeHandler] Airtime purchase failed:', err);
+    throw new Error(err);
   }
 }

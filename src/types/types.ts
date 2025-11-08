@@ -156,8 +156,8 @@ export type UVerifyBVN = {
 export type TransferPayload = {
   idempotencyKey?: string;
   initiatorUserId: string;
-  fromPhone: string;
-  toPhone?: string; // for internal transfers
+  sender: string;
+  receiver?: string; // for internal transfers
   amount: bigint | number; // smallest unit
   currency?: string;
   reason?: string;

@@ -1,7 +1,9 @@
-import { Embedly } from '@/extensions/embedly';
+import { Queue } from '@/jobs/queues';
 import { prisma } from '@/prisma/client';
 import { ExternalTransferInput, TransferPayload } from '@/types/types';
+import { DAILY_LIMITS } from '@/utils';
 import CustomError from '@/utils/customError';
+import { Prisma, User, Wallet } from '@prisma/client';
 
 export async function transferToExternalBank(payload: ExternalTransferInput) {
   const {
@@ -30,117 +32,80 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
   // ------------------------------
   // 2️⃣ Resolve Wallet & Balance
   // ------------------------------
-  const fromWallet = await prisma.wallet.findFirst({
-    where: { userId: initiatorUserId },
-  });
+  const [fromWallet, fromUser] = await Promise.all([
+    prisma.wallet.findFirst({
+      where: { userId: initiatorUserId },
+    }),
+    prisma.user.findFirst({ where: { id: initiatorUserId } }),
+  ]);
+
+  if (!fromUser) throw new CustomError('User not found', 404);
   if (!fromWallet) throw new CustomError('Wallet not found', 404);
 
   if (Number(fromWallet.availableBalance) < amount)
     throw new CustomError('Insufficient balance', 422);
 
-  try {
-    const result = await Embedly.banks.transfer({
-      amount,
-      currency,
-      destinationBank,
-      destinationAccountNumber,
-      destinationAccountName,
-      sourceAccountNumber: fromWallet.accountNumber?.trim(),
-      sourceAccountName: senderName.trim() ?? 'Wepay User',
-      remarks: reason,
-    });
+  const transferRecord = await prisma.$transaction(async (tx) => {
+    // Check for daily limit
+    const limitExceeded = await checkDailyLimit(
+      tx,
+      fromWallet,
+      fromUser,
+      BigInt(amount),
+    );
+    if (limitExceeded) throw new CustomError(`Daily limit exceeded.`, 403);
 
-    if (!result.succeeded) throw new CustomError('Transfer not succeeded', 500);
-
-    const transferRecord = await prisma.$transaction(async (tx) => {
-      // 3.1 Create pending transfer
-      const transfer = await tx.transfer.create({
-        data: {
-          idempotencyKey,
-          fromWalletId: fromWallet.id,
-          toWalletId: fromWallet.id, // temporary, not external wallet
-          amount: BigInt(amount),
-          currency,
-          initiatedBy: initiatorUserId,
-          reason,
-          status: 'PENDING',
-          transactionReference: result.data,
-          shouldRefund: true,
-          type: 'EXTERNAL',
-        },
-      });
-
-      // 3.2 Debit user wallet
-      const newBalance = BigInt(fromWallet.availableBalance) - BigInt(amount);
-      await tx.wallet.update({
-        where: { id: fromWallet.id },
-        data: {
-          availableBalance: Number(newBalance),
-        },
-      });
-
-      // 3.3 Create ledger entry (DEBIT)
-      await tx.ledger.create({
-        data: {
-          walletId: fromWallet.id,
-          transferId: transfer.id,
-          change: BigInt(-amount),
-          balanceAfter: newBalance,
-          type: 'TRANSFER_DEBIT',
-          metadata: {
-            reason,
-            toBankCode: destinationBank,
-            toAccount: destinationAccountNumber,
-          },
-        },
-      });
-
-      // 3.4 Create outbox for async publish
-      await tx.outboxEvent.create({
-        data: {
-          topic: 'transfer.external.initiated',
-          payload: {
-            transferId: transfer.id,
-            userId: initiatorUserId,
-            amount,
-            currency,
-            toBankCode: destinationBank,
-            toAccountNumber: destinationAccountNumber,
-            toAccountName: destinationAccountName,
-          },
-        },
-      });
-
-      return transfer;
-    });
-
-    if (!transferRecord) throw new CustomError('Transfer failed', 500);
-
-    return transferRecord;
-  } catch (err) {
-    await prisma.transfer.create({
+    const transfer = await tx.transfer.create({
       data: {
-        status: 'FAILED',
         idempotencyKey,
         fromWalletId: fromWallet.id,
-        toWalletId: fromWallet.id, // temporary, not external wallet
+        toWalletId: '', // temporary, not external wallet
         amount: BigInt(amount),
         currency,
         initiatedBy: initiatorUserId,
         reason,
+        status: 'PENDING',
+        shouldRefund: true,
+        type: 'EXTERNAL',
       },
     });
 
-    throw new CustomError('External transfer failed', 500);
-  }
+    // create outbox event
+    await tx.outboxEvent.create({
+      data: {
+        aggregateId: transfer.id,
+        topic: 'transfer.external.initiated',
+        payload: {
+          transferId: transfer.id,
+          fromWalletId: fromWallet.id,
+          destinationBank,
+          destinationAccountNumber,
+          destinationAccountName,
+          sourceAccountNumber: fromWallet.accountNumber?.trim(),
+          sourceAccountName: senderName.trim() ?? 'Wepay User',
+          remarks: reason,
+          amount,
+          currency,
+          initiatedBy: initiatorUserId,
+          timestamp: new Date().toISOString(),
+        },
+      },
+    });
+
+    return transfer;
+  });
+
+  await Queue.trigger(transferRecord.id, 'TRANSFER');
+
+  return transferRecord;
 }
 
 export async function walletToWalletTransfer(payload: TransferPayload) {
   const {
     idempotencyKey,
     initiatorUserId,
-    fromPhone,
-    toPhone,
+    sender,
+    receiver,
     amount,
     currency = 'NGN',
     reason,
@@ -152,75 +117,135 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
   if (amt <= 0n) throw new Error('Amount must be positive');
 
   // Resolve sender and recipient
-  const fromUser = await prisma.user.findUnique({
-    where: { phone: fromPhone },
-  });
-  if (!fromUser) throw new Error('Sender not found');
+  const [fromWallet, toWallet] = await Promise.all([
+    prisma.wallet.findFirst({
+      where: { accountNumber: sender, currency },
+      include: { user: true },
+    }),
+    prisma.wallet.findFirst({
+      where: { accountNumber: receiver, currency },
+      include: { user: true },
+    }),
+  ]);
 
-  const toUser = await prisma.user.findUnique({ where: { phone: toPhone } });
-  if (!toUser) throw new Error('Recipient not found');
+  if (!fromWallet)
+    throw new CustomError(
+      `Sender wallet not found for currency ${currency}`,
+      404,
+    );
+  if (!toWallet)
+    throw new CustomError(
+      `Recipient wallet not found for currency ${currency}`,
+      404,
+    );
 
-  if (fromUser.id === toUser.id) throw new Error('Cannot transfer to self');
+  if (fromWallet.status !== 'ACTIVE')
+    throw new CustomError(
+      'Sender wallet is not active. Please follow our instructions to activate your wallet',
+      403,
+    );
+  if (toWallet.status !== 'ACTIVE')
+    throw new CustomError(
+      'Recipient wallet is not active. Please follow our instructions to activate your wallet',
+      403,
+    );
 
-  const fromWallet = await prisma.wallet.findFirst({
-    where: { userId: fromUser.id },
-  });
-  const toWallet = await prisma.wallet.findFirst({
-    where: { userId: toUser.id },
-  });
+  const fromUser = fromWallet.user;
+  const toUser = toWallet.user;
 
-  if (!fromWallet || !toWallet) throw new Error('Wallets not found');
+  // Checks
+  if (!toUser) throw new CustomError('Recipient not found', 404);
+  if (!fromUser) throw new CustomError('Sender not found', 404);
+  if (fromUser.status !== 'ACTIVE')
+    throw new CustomError(
+      'Sender account is not active. Please follow our instructions to activate your account',
+      403,
+    );
+  if (toUser.status !== 'ACTIVE')
+    throw new CustomError(
+      'Recipient account is not active. Please follow our instructions to activate your wallet',
+      403,
+    );
+  if (fromUser.id === toUser.id)
+    throw new CustomError('Cannot transfer to self', 422);
 
   // canonical order to avoid deadlocks
   const ordered = [fromWallet.id, toWallet.id].sort();
 
   return prisma.$transaction(async (tx) => {
     // idempotency guard
-    if (idempotencyKey) {
-      const existing = await tx.transfer.findUnique({
-        where: { idempotencyKey },
-      });
-      if (existing) {
-        // return existing transfer or throw if mismatch
-        return existing;
-      }
-    }
+
+    const existing = await tx.transfer.findUnique({
+      where: { idempotencyKey },
+    });
+    if (existing) return existing; // log here
 
     // lock wallets with FOR UPDATE
-    // parameterize carefully
-    const lockedRows = await tx.$queryRawUnsafe(
-      `SELECT * FROM "Wallet" WHERE id IN ($1, $2) FOR UPDATE`,
-      ordered[0],
-      ordered[1],
-    );
+    const lockedRows = await tx.$queryRaw<
+      any[]
+    >`SELECT id, "userId", currency, "ledgerBalance", "availableBalance", "reservedBalance", version, status FROM "Wallet" WHERE id IN (${ordered[0]}, ${ordered[1]}) FOR UPDATE`;
+    if (lockedRows.length !== 2)
+      throw new CustomError('Failed to lock wallets', 500);
 
     // map locked rows
     const lockedMap = new Map((lockedRows as any[]).map((r) => [r.id, r]));
-
     const lockedFrom = lockedMap.get(fromWallet.id);
     const lockedTo = lockedMap.get(toWallet.id);
 
-    if (!lockedFrom || !lockedTo) {
-      throw new Error('Failed to lock wallets');
-    }
+    if (!lockedFrom || !lockedTo)
+      throw new CustomError('Failed to lock wallets', 422);
 
     // check funds
     const available = BigInt(lockedFrom.availableBalance as any);
-    const reserved = BigInt((lockedFrom.reservedBalance as any) || 0);
-    if (available - reserved < amt) throw new Error('Insufficient funds');
+    // const reserved = BigInt((lockedFrom.reservedBalance as any) || 0);
+    if (available < amt) throw new CustomError('Insufficient funds', 403);
+
+    // Check for daily limit
+    const isDailyLimitExceeded = await checkDailyLimit(
+      tx,
+      fromWallet,
+      fromUser,
+      amt,
+    );
+    if (isDailyLimitExceeded)
+      throw new CustomError(`Daily limit exceeded.`, 403);
 
     // create Transfer record
+    const operationId = `transfer_${payload.idempotencyKey}`;
     const transfer = await tx.transfer.create({
       data: {
         idempotencyKey,
         fromWalletId: fromWallet.id,
         toWalletId: toWallet.id,
-        amount: amt.toString(),
+        amount: amt,
         currency,
         initiatedBy: initiatorUserId,
         reason,
         status: 'PENDING',
-      } as any,
+        metadata: {
+          operationId,
+          timestamp: new Date().toISOString(),
+        },
+      },
+    });
+
+    // create outbox event
+    await tx.outboxEvent.create({
+      data: {
+        aggregateId: transfer.id,
+        topic: 'transfer.internal.initiated',
+        payload: {
+          transferId: transfer.id,
+          fromWalletId: fromWallet.id,
+          toWalletId: toWallet.id,
+          amount: amt.toString(),
+          fromUserId: fromUser.id,
+          toUserId: toUser.id,
+          currency,
+          initiatedBy: initiatorUserId,
+          timestamp: new Date().toISOString(),
+        },
+      },
     });
 
     // create JournalEntry
@@ -229,6 +254,11 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
         reference: transfer.id,
         transferId: transfer.id,
         description: reason ?? 'internal transfer',
+        metadata: {
+          operationId,
+          fromWalletId: fromWallet.id,
+          toWalletId: toWallet.id,
+        },
       },
     });
 
@@ -245,11 +275,15 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
         walletId: fromWallet.id,
         journalId: journal.id,
         transferId: transfer.id,
-        change: (-amt).toString(),
+        change: -amt,
         balanceAfter: newFromLedgerBal,
         type: 'TRANSFER_DEBIT',
-        metadata: { reason },
-      } as any,
+        metadata: {
+          reason,
+          operationId,
+          recipientWalletId: toWallet.id,
+        },
+      },
     });
 
     const credit = await tx.ledger.create({
@@ -257,36 +291,41 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
         walletId: toWallet.id,
         journalId: journal.id,
         transferId: transfer.id,
-        change: amt.toString(),
+        change: amt,
         balanceAfter: newToLedgerBal,
         type: 'TRANSFER_CREDIT',
-        metadata: { reason },
-      } as any,
+        metadata: {
+          reason,
+          operationId,
+          senderWalletId: fromWallet.id,
+        },
+      },
     });
 
-    // update wallets balances
+    // Update sender wallet
     await tx.wallet.update({
       where: { id: fromWallet.id },
       data: {
         ledgerBalance: newFromLedgerBal,
         availableBalance: newFromAvailable,
         version: { increment: 1 },
-      } as any,
+      },
     });
 
+    // Update recipient wallet
     await tx.wallet.update({
       where: { id: toWallet.id },
       data: {
         ledgerBalance: newToLedgerBal,
         availableBalance: newToAvailable,
         version: { increment: 1 },
-      } as any,
+      },
     });
 
     // mark transfer completed
     await tx.transfer.update({
       where: { id: transfer.id },
-      data: { status: 'COMPLETED' as any },
+      data: { status: 'COMPLETED' as any, completedAt: new Date() },
     });
 
     // create outbox event
@@ -300,6 +339,12 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
           toWalletId: toWallet.id,
           amount: amt.toString(),
           currency,
+          fromUserId: fromUser.id,
+          toUserId: toUser.id,
+          journalId: journal.id,
+          debitLedgerId: debit.id,
+          creditLedgerId: credit.id,
+          completedAt: new Date().toISOString(),
         },
       },
     });
@@ -331,4 +376,30 @@ export async function createWallet(payload: any) {
   });
 
   return wallet;
+}
+
+async function checkDailyLimit(
+  tx: Prisma.TransactionClient,
+  fromWallet: Wallet,
+  fromUser: User,
+  amt: bigint,
+) {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const totalTransferredToday = await tx.transfer.aggregate({
+    _sum: { amount: true },
+    where: {
+      fromWalletId: fromWallet.id,
+      createdAt: { gte: todayStart },
+      status: { in: ['PENDING', 'COMPLETED'] },
+    },
+  });
+
+  const transferred = BigInt(totalTransferredToday._sum.amount || 0);
+
+  const tier = fromUser.currentTier as keyof typeof DAILY_LIMITS;
+  const dailyLimit = DAILY_LIMITS[tier] || DAILY_LIMITS.TIER_1;
+
+  return transferred + amt > dailyLimit;
 }

@@ -13,6 +13,10 @@ export interface Environment {
     expiresIn: string;
     saltRounds: number;
   };
+  redis: {
+    host: string;
+    port: number;
+  };
   aws: {
     projectId: string;
     bucket: string;
@@ -107,6 +111,10 @@ export const environment: Environment = {
     secret: process.env.JWT_ACCESS_SECRET as string,
     refreshSecret: process.env.JWT_REFRESH_SECRET as string,
     saltRounds: Number(process.env.AUTH_SALT_ROUNDS) || 10,
+  },
+  redis: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: Number(process.env.REDIS_PORT || '6379'),
   },
   mail: {
     host: process.env.MAIL_HOST as string,

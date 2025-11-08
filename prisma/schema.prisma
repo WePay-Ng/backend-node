@@ -24,9 +24,13 @@ model User {
   religion               String?              @db.VarChar(30)
   maritalStatus          String?              @db.VarChar(20)
   pin                    String?
+  status                 Status               @default(ACTIVE)
   isLocked               Boolean              @default(false)
   failedLoginAttempts    Int                  @default(0)
   lockUntil              DateTime?
+  tierId                 String?              @db.Char(36)
+  currentTier            String               @default("TIER_1")
+  tier                   TierLimit?           @relation("UserTierLimit", fields: [tierId], references: [id])
   passwordResetTokenHash String?
   passwordResetExpires   DateTime?
   createdAt              DateTime             @default(now())
@@ -265,10 +269,20 @@ model VerificationIntent {
   updatedAt   DateTime               @default(now()) @updatedAt @db.Timestamp(6)
 }
 
+model TierLimit {
+  id        String   @id @default(uuid())
+  tier      String   @unique
+  dailyCap  BigInt
+  createdAt DateTime @default(now())
+  users     User[]   @relation("UserTierLimit")
+}
+
 model Wallet {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
   userId           String    @db.Char(36)
   walletId         String
+  status           Status    @default(INACTIVE)
+  currency         String    @default("NGN")
   bankName         String    @db.Char(20)
   bankCode         String    @db.Char(3)
   accountNumber    String    @db.Char(10)
@@ -289,8 +303,10 @@ model Wallet {
 model Transfer {
   id                   String         @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
   idempotencyKey       String?        @unique
-  fromWalletId         String         @db.Char(36)
-  toWalletId           String         @db.Char(36)
+  fromWalletId         String?        @db.Char(36)
+  fromProviderId       String?        @db.Char(36)
+  toWalletId           String?        @db.Char(36)
+  provider             String         @default("EMBEDLY")
   amount               BigInt
   shouldRefund         Boolean        @default(true)
   transactionReference String?
@@ -298,6 +314,8 @@ model Transfer {
   status               TransferStatus @default(PENDING)
   initiatedBy          String? // userId who initiated
   reason               String?
+  metadata             Json?
+  completedAt          DateTime?
   type                 TransferType   @default(INTERNAL)
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @default(now()) @updatedAt
@@ -349,6 +367,7 @@ model JournalEntry {
   reference   String? // external provider ref (eg Embedly reference)
   transferId  String?   @db.Char(36)
   description String?
+  metadata    Json?
   createdAt   DateTime  @default(now())
   postedAt    DateTime?
 
@@ -359,8 +378,15 @@ model JournalEntry {
   @@index([reference])
 }
 
+enum Status {
+  ACTIVE
+  PENDING
+  INACTIVE
+}
+
 enum TransferStatus {
   PENDING
+  PROCESSING
   COMPLETED
   FAILED
   CANCELLED

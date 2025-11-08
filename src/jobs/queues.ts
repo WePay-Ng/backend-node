@@ -1,20 +1,126 @@
-import { processAirtimeEvent } from './process-airtime';
-import Bottleneck from 'bottleneck';
+import { Queue as BullQueue } from 'bullmq';
+import { QUEUE_NAMES } from '@/utils';
+import { environment } from '@/config/env';
+import { Workers } from './Workers';
 
-const limiter = new Bottleneck({
-  maxConcurrent: 1,
-  minTime: 333,
+const connection = {
+  host: environment.redis.host,
+  port: environment.redis.port,
+  maxRetriesPerRequest: null,
+  enableReadyCheck: false,
+};
+
+const defaultJobOptions = {
+  attempts: 3,
+  backoff: {
+    type: 'exponential' as const,
+    delay: 2000,
+  },
+  removeOnComplete: {
+    count: 1000,
+    age: 24 * 3600,
+  },
+  removeOnFail: {
+    count: 5000,
+    age: 7 * 24 * 3600,
+  },
+};
+
+export const transferQueue = new BullQueue(QUEUE_NAMES.TRANSFER, {
+  connection,
+  defaultJobOptions: {
+    ...defaultJobOptions,
+    attempts: 2,
+  },
+});
+
+export const airtimeQueue = new BullQueue(QUEUE_NAMES.AIRTIME, {
+  connection,
+  defaultJobOptions: {
+    ...defaultJobOptions,
+    attempts: 2,
+  },
+});
+
+export const notificationQueue = new BullQueue(QUEUE_NAMES.NOTIFICATION, {
+  connection,
+  defaultJobOptions: {
+    ...defaultJobOptions,
+    // attempts: 2,
+  },
 });
 
 export class Queue {
-  static trigger(id: string, type: string) {
+  static async trigger(
+    id: string,
+    type: keyof typeof QUEUE_NAMES,
+    data?: any,
+  ): Promise<{ jobId: string; status: string }> {
     switch (type) {
       case 'AIRTIME':
-        limiter.schedule(() => processAirtimeEvent(id));
-        break;
+        return this.triggerAirtime(id);
 
+      case 'TRANSFER':
+        return this.triggerTransfer(id);
+
+      case 'NOTIFICATION':
+        return this.triggerNotification(id, data);
       default:
-        break;
+        throw new Error(`Unknown queue type: ${type}`);
     }
   }
+
+  private static async triggerAirtime(
+    id: string,
+  ): Promise<{ jobId: string; status: string }> {
+    const job = await airtimeQueue.add(
+      'process-airtime',
+      { id },
+      {
+        jobId: `transfer-${id}`,
+        priority: 2,
+      },
+    );
+
+    return {
+      jobId: job.id!,
+      status: 'queued',
+    };
+  }
+
+  private static async triggerTransfer(id: string) {
+    const job = await transferQueue.add(
+      'process-transfer',
+      { id },
+      {
+        jobId: `transfer-${id}`,
+        priority: 2,
+      },
+    );
+
+    return {
+      jobId: job.id!,
+      status: 'queued',
+    };
+  }
+
+  private static async triggerNotification(id: string, data: any) {
+    const job = await notificationQueue.add(
+      'process-notification',
+      { id, data },
+      {
+        jobId: `notification-${id}`,
+        priority: 3,
+      },
+    );
+
+    return {
+      jobId: job.id!,
+      status: 'queued',
+    };
+  }
 }
+
+Workers.airtimeWorker();
+Workers.transferWorker();
+Workers.notificationWorker();

@@ -162,7 +162,7 @@ export async function airtime(
     };
   });
 
-  Queue.trigger(airtime.transaction.id, 'AIRTIME');
+  await Queue.trigger(airtime.transaction.id, 'AIRTIME');
 
   return airtime;
 }

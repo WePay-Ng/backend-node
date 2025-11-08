@@ -41,6 +41,12 @@ export function isDev() {
   return ['DEVELOP', 'LOCAL'].includes(environment.context);
 }
 
+export const QUEUE_NAMES = {
+  TRANSFER: 'transfer',
+  AIRTIME: 'airtime',
+  NOTIFICATION: 'notification',
+} as const;
+
 export async function sendOTP(user: User) {
   const code = otpGenerator.generate(6, {
     lowerCaseAlphabets: false,
@@ -83,6 +89,13 @@ export function formatPhoneNumber(number: string | number, dailCode: string) {
     ? number
     : Number(`${dailCode.split('+')[1]}${number.toString().substring(1)}`);
 }
+
+export const DAILY_LIMITS = {
+  TIER_1: 200_000n,
+  TIER_2: 1_000_000n,
+  TIER_3: 5_000_000n,
+  TIER_4: 100_000_000_000n,
+};
 
 /**
  * Converts any valid date string, timestamp, or Date object

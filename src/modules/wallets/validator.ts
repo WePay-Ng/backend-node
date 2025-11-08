@@ -2,8 +2,8 @@ import Joi from 'joi';
 
 export function ValidateTransfer() {
   return Joi.object({
-    fromPhone: Joi.string().required(),
-    toPhone: Joi.string().required(),
+    sender: Joi.string().required(),
+    receiver: Joi.string().required(),
     amount: Joi.number().required(), // smallest unit (integer)
     currency: Joi.string().max(3).required(),
     reason: Joi.string(),

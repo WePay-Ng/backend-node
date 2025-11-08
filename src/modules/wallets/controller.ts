@@ -7,6 +7,7 @@ import {
 } from './validator';
 import * as WalletService from './service';
 import { useErrorParser } from '@/utils';
+import { prisma } from '@/prisma/client';
 
 export class Controller {
   static async transfer(req: Request, res: Response) {
@@ -90,5 +91,24 @@ export class Controller {
       const e = useErrorParser(error);
       return res.status(e.status).json(e);
     }
+  }
+
+  static async getWalletFromAccount(req: Request, res: Response) {
+    try {
+      const accountNumber = req.params?.account;
+
+      const wallet = await prisma.wallet.findFirst({
+        where: { accountNumber: accountNumber },
+        include: { user: true },
+      });
+
+      if (!wallet) throw new CustomError('Wallet not found', 404);
+
+      return res.status(200).json({
+        message: 'Wallet retrieved successfully',
+        success: true,
+        data: wallet,
+      });
+    } catch (error) {}
   }
 }
