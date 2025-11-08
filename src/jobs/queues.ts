@@ -9,6 +9,7 @@ const connection = {
   password: environment.redis.password,
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
+  tls: {},
 };
 
 const defaultJobOptions = {
