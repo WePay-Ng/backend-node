@@ -111,4 +111,8 @@ export class Controller {
       });
     } catch (error) {}
   }
+
+  // Get banks with images (https://nigerianbanklogos.xyz/docs)
+  static async getBanks() {}
+  static async getBankByAccountNumber() {}
 }
