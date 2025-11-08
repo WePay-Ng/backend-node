@@ -6,11 +6,9 @@ export async function payout(payload: any) {
     where: { transactionReference: payload.reference },
   });
 
-  console.log(transfer, 'TRANSFER');
-
   if (!transfer) throw new CustomError('Transfer not found', 404);
 
-  if (payload?.success !== 'Success') {
+  if (payload?.status !== 'Success') {
     await prisma.transfer.update({
       where: { id: transfer?.id },
       data: { status: 'FAILED' },
@@ -36,10 +34,10 @@ export async function payout(payload: any) {
   const transferRecord = await prisma.$transaction(async (tx) => {
     const updatedTransfer = await tx.transfer.update({
       where: { id: transfer?.id },
-      data: { status: 'COMPLETED' },
+      data: { status: 'COMPLETED', toWalletId: metadata?.provideId },
     });
 
-    const wallet = await prisma.wallet.findFirst({
+    const wallet = await tx.wallet.findFirst({
       where: { accountNumber: payload?.accountNumber },
     });
 
@@ -52,7 +50,8 @@ export async function payout(payload: any) {
       data: {
         reference: payload.reference,
         transferId: updatedTransfer.id,
-        description: 'Commission on Nip',
+        description: payload.deliveryStatusMessage,
+        postedAt: new Date().toISOString(),
         metadata: {
           fromWalletId: wallet?.id,
           toProvider: 'EMBEDLY',
@@ -61,23 +60,23 @@ export async function payout(payload: any) {
     });
 
     // Create Debit Ledger
-    await prisma.ledger.create({
+    await tx.ledger.create({
       data: {
         walletId: wallet?.id,
         journalId: journal.id,
         transferId: transfer.id,
-        change: -newToLedgerBal,
+        change: -BigInt(payload.amount),
         balanceAfter: newToLedgerBal,
-        type: 'FEE',
+        type: 'TRANSFER_DEBIT',
         metadata: {
-          reason: 'Commission on Nip',
+          reason: payload.deliveryStatusMessage,
           fromWalletId: wallet?.id,
           toProvider: 'EMBEDLY',
         },
       },
     });
 
-    const updatedWallet = await prisma.wallet.update({
+    const updatedWallet = await tx.wallet.update({
       where: { id: wallet?.id },
       data: {
         ledgerBalance: newToLedgerBal,
@@ -105,7 +104,7 @@ export async function payout(payload: any) {
     });
 
     // Create Debit Ledger
-    await prisma.ledger.create({
+    await tx.ledger.create({
       data: {
         walletId: wallet?.id,
         journalId: feeJournal.id,
@@ -121,7 +120,7 @@ export async function payout(payload: any) {
       },
     });
 
-    await prisma.ledger.create({
+    const feeLedger = await tx.ledger.create({
       data: {
         walletId: wallet?.id,
         journalId: feeJournal.id,
@@ -137,7 +136,7 @@ export async function payout(payload: any) {
       },
     });
 
-    await prisma.wallet.update({
+    await tx.wallet.update({
       where: { id: wallet?.id },
       data: {
         ledgerBalance: newToLedgerBalAfterFee,
@@ -148,12 +147,13 @@ export async function payout(payload: any) {
     // Add Fee
     await tx.fee.create({
       data: {
-        amount: payload.fee,
+        amount: feeRate,
         currency: transfer.currency,
-        rate: Number(process.env.EXTERNAL_PERCENT) ?? 15,
+        rate: feeRate,
         status: 'SUCCESS',
         provider: metadata?.provideId,
         transactionId: updatedTransfer.id,
+        ledgerId: feeLedger.id,
         type: 'EXTERNAL',
       },
     });
@@ -171,7 +171,6 @@ export async function payout(payload: any) {
       },
     });
 
-    console.log(updatedTransfer, 'UPDATED TRANSFER');
     return updatedTransfer;
   });
 

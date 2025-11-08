@@ -100,6 +100,7 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
           remarks: reason,
           amount,
           currency,
+          providerId: provider.id,
           initiatedBy: initiatorUserId,
           timestamp: new Date().toISOString(),
         },

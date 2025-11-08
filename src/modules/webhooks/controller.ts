@@ -12,8 +12,6 @@ export class Controller {
       const body = req.body;
       const rawBody = body?.toString('utf8');
 
-      console.log(rawBody, 'RAW BODY');
-
       if (!signature || !rawBody)
         throw new CustomError('Missing signature or body', 400);
 
@@ -28,8 +26,6 @@ export class Controller {
 
       const result = req.body;
       let transfer = undefined;
-
-      console.log(result, 'RESULT');
 
       if (result.event === 'nip')
         transfer = await webhookService.inflow(result?.data);
