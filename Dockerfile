@@ -11,7 +11,9 @@ RUN apk add --no-cache python3 make g++ git
 COPY package*.json yarn.lock ./
 
 # Install dependencies (omit dev dependencies for production)
-RUN yarn install --frozen-lockfile --production
+RUN yarn install 
+
+#--frozen-lockfile --production
 
 # Copy the rest of the application
 COPY . .
