@@ -1,0 +1,37 @@
+version: "3.9"
+
+networks:
+  wepay_network:
+    driver: bridge
+
+volumes:
+  wepay_redis_data:
+
+services:
+  wepay-backend:
+    build: .
+    container_name: wepay-backend
+    restart: unless-stopped
+    ports:
+      - "4000:8000"  # external:internal to avoid conflict with other apps
+    environment:
+      - PORT=8000
+      - REDIS_HOST=wepay-redis
+      - REDIS_PORT=6379
+    env_file:
+      - .env
+    depends_on:
+      - wepay-redis
+    networks:
+      - wepay_network
+
+  wepay-redis:
+    image: redis:7-alpine
+    container_name: wepay-redis
+    restart: unless-stopped
+    volumes:
+      - wepay_redis_data:/data
+    ports:
+      - "6380:6379" # external:internal to avoid conflict with any global Redis
+    networks:
+      - wepay_network

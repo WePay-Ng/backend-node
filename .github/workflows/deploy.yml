@@ -1,0 +1,54 @@
+name: Deploy to GCP VM
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          # Write DEPLOY_KEY safely, remove carriage returns
+          echo "${{ secrets.DEPLOY_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          # Use precomputed known_hosts from secret
+        #   echo "${{ secrets.KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.KNOWN_HOSTS }}
+      - name: Add server to known_hosts automatically
+        run: |
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+      - name: Deploy to VM
+        run: |
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes $VM_USER@$VM_HOST "
+          if [ -d /home/${{ secrets.VM_USER }}/executor-app/.git ]; then
+              cd /home/${{ secrets.VM_USER }}/executor-app
+              git fetch --all
+              git reset --hard origin/main
+          else
+              rm -rf /home/${{ secrets.VM_USER }}/executor-app
+              git clone git@github.com:backendcommunity/mb_executor.git /home/${{ secrets.VM_USER }}/executor-app
+              cd /home/${{ secrets.VM_USER }}/executor-app
+          fi
+
+          # Run docker only if compose file exists
+          if [ -f docker-compose.yml ]; then
+              docker compose down || true
+              docker compose up -d --build
+          else
+              echo '⚠️ No docker-compose.yml found!'
+          fi
+          "
+
+        env:
+          VM_USER: ${{ secrets.VM_USER }}
+          VM_HOST: ${{ secrets.VM_HOST }}
