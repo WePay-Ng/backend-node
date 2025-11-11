@@ -30,14 +30,14 @@ jobs:
       - name: Deploy to VM
         run: |
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes $VM_USER@$VM_HOST "
-          if [ -d /home/${{ secrets.VM_USER }}/executor-app/.git ]; then
-              cd /home/${{ secrets.VM_USER }}/executor-app
+          if [ -d /home/${{ secrets.VM_USER }}/wepay-app/.git ]; then
+              cd /home/${{ secrets.VM_USER }}/wepay-app
               git fetch --all
               git reset --hard origin/main
           else
-              rm -rf /home/${{ secrets.VM_USER }}/executor-app
-              git clone git@github.com:backendcommunity/mb_executor.git /home/${{ secrets.VM_USER }}/executor-app
-              cd /home/${{ secrets.VM_USER }}/executor-app
+              rm -rf /home/${{ secrets.VM_USER }}/wepay-app
+              git clone git@github.com:Kaperskyguru/wepay.git /home/${{ secrets.VM_USER }}/wepay-app
+              cd /home/${{ secrets.VM_USER }}/wepay-app
           fi
 
           # Run docker only if compose file exists
