@@ -8,10 +8,10 @@ WORKDIR /usr/src/wepay-app
 RUN apk add --no-cache python3 make g++ git
 
 # Copy package files
-COPY package*.json ./
+COPY package*.json yarn.lock ./
 
 # Install dependencies (omit dev dependencies for production)
-RUN npm install --omit=dev
+RUN yarn install --frozen-lockfile --production
 
 # Copy the rest of the application
 COPY . .
@@ -20,4 +20,4 @@ COPY . .
 EXPOSE 8000
 
 # Start the server
-CMD ["npm", "run", "dev"]
+CMD ["yarn", "run", "dev"]
