@@ -16,6 +16,7 @@ export interface Environment {
   redis: {
     host: string;
     port: number;
+    url: string;
     password?: string;
   };
   aws: {
@@ -116,6 +117,7 @@ export const environment: Environment = {
   redis: {
     host: process.env.REDIS_HOST || 'localhost',
     port: Number(process.env.REDIS_PORT || '6379'),
+    url: process.env.REDIS_URL as string,
     password: process.env.REDIS_PASSWORD,
   },
   mail: {

@@ -2,6 +2,12 @@ import { Queue as BullQueue } from 'bullmq';
 import { QUEUE_NAMES } from '@/utils';
 import { environment } from '@/config/env';
 import { Workers } from './Workers';
+import IORedis from 'ioredis';
+
+const redisClient = new IORedis(environment.redis.url, {
+  maxRetriesPerRequest: null,
+  enableReadyCheck: false,
+});
 
 const connection = {
   host: environment.redis.host,
@@ -29,7 +35,7 @@ const defaultJobOptions = {
 };
 
 export const transferQueue = new BullQueue(QUEUE_NAMES.TRANSFER, {
-  connection,
+  connection: redisClient,
   defaultJobOptions: {
     ...defaultJobOptions,
     attempts: 2,
@@ -37,7 +43,7 @@ export const transferQueue = new BullQueue(QUEUE_NAMES.TRANSFER, {
 });
 
 export const airtimeQueue = new BullQueue(QUEUE_NAMES.AIRTIME, {
-  connection,
+  connection: redisClient,
   defaultJobOptions: {
     ...defaultJobOptions,
     attempts: 2,
@@ -45,7 +51,7 @@ export const airtimeQueue = new BullQueue(QUEUE_NAMES.AIRTIME, {
 });
 
 export const notificationQueue = new BullQueue(QUEUE_NAMES.NOTIFICATION, {
-  connection,
+  connection: redisClient,
   defaultJobOptions: {
     ...defaultJobOptions,
     // attempts: 2,

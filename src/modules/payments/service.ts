@@ -149,7 +149,7 @@ export async function airtime(
           fromWalletId: fromWallet.id,
           amount: amt.toString(),
           currency: 'NGN',
-          country: payload.country
+          country: payload.country,
         },
       },
     });
@@ -163,6 +163,5 @@ export async function airtime(
   });
 
   await Queue.trigger(airtime.transaction.id, 'AIRTIME');
-
   return airtime;
 }
