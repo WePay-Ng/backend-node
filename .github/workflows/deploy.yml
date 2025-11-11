@@ -36,7 +36,7 @@ jobs:
               git reset --hard origin/main
           else
               rm -rf /home/${{ secrets.VM_USER }}/wepay-app
-              git clone git@github.com:Kaperskyguru/wepay.git /home/${{ secrets.VM_USER }}/wepay-app
+              git clone https://github.com/Kaperskyguru/wepay.git /home/${{ secrets.VM_USER }}/wepay-app
               cd /home/${{ secrets.VM_USER }}/wepay-app
           fi
 
