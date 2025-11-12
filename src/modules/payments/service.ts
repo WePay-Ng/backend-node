@@ -30,10 +30,9 @@ export async function airtime(
 
   //   Check for sufficient amount here
   const avaiBal = Number(fromWallet.availableBalance);
-  const resrBal = Number(fromWallet.reservedBalance);
-
-  if (avaiBal - resrBal < amt)
-    throw new CustomError('Insufficient balance', 422);
+  // const resrBal = Number(fromWallet.reservedBalance);
+  console.log(avaiBal, amt);
+  if (avaiBal < amt) throw new CustomError('Insufficient balance', 422);
 
   const airtime = await prisma.$transaction(async (tx) => {
     // lock wallets with FOR UPDATE
