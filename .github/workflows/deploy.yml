@@ -23,7 +23,6 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
             set -e
 
-            mkdir /wepay-app
             cd /wepay-app
 
             echo "Pulling latest code..."
