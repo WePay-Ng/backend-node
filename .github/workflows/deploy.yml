@@ -20,7 +20,9 @@ jobs:
 
       - name: Deploy to VM
         run: |
-            ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes $VM_USER@$VM_HOST "
+            ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
+            set -e
+            
             if [ -d /${{ secrets.VM_USER }}/wepay-app/.git ]; then
                 cd /${{ secrets.VM_USER }}/wepay-app
                 git fetch --all
