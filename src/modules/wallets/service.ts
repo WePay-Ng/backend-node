@@ -18,6 +18,8 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
     reason = 'Funds Transfer',
   } = payload;
 
+  console.log(payload);
+
   if (!idempotencyKey) throw new CustomError('Missing idempotency key', 400);
   if (amount <= 0) throw new CustomError('Invalid amount', 400);
 
@@ -44,6 +46,7 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
 
   const feeRate = Number(process.env.EXTERNAL_PERCENT) ?? 15;
   const totalAmount = amount + feeRate;
+  console.log('TOTAL AMOUNT', totalAmount);
 
   if (Number(fromWallet.availableBalance) < totalAmount)
     throw new CustomError('Insufficient balance', 422);
@@ -65,6 +68,8 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
         provider: 'EMBEDLY',
       },
     });
+
+    console.log('BIG INT', BigInt(amount));
 
     const transfer = await tx.transfer.create({
       data: {
