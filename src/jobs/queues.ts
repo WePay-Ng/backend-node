@@ -9,6 +9,8 @@ const redisClient = new IORedis(environment.redis.url, {
   enableReadyCheck: false,
 });
 
+console.log(environment.redis.url);
+
 const connection = {
   host: environment.redis.host,
   port: environment.redis.port,

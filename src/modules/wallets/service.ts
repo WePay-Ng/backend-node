@@ -57,7 +57,7 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
       tx,
       fromWallet,
       fromUser,
-      BigInt(amount),
+      BigInt(totalAmount),
     );
     if (limitExceeded) throw new CustomError(`Daily limit exceeded.`, 403);
 

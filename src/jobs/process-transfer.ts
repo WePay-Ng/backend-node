@@ -7,7 +7,7 @@ export async function processTransferEvent(eventId: any) {
   const event = await prisma.outboxEvent.findFirst({
     where: { aggregateId: eventId },
   });
-
+  console.log(event, 'EVENT');
   if (!event) throw new CustomError('Event not found', 404);
 
   const payload = event?.payload as {
