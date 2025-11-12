@@ -13,10 +13,11 @@ COPY package*.json yarn.lock ./
 # Install dependencies (omit dev dependencies for production)
 RUN yarn install 
 
-#--frozen-lockfile --production
-
 # Copy the rest of the application
 COPY . .
+
+# Run Prisma generate INSIDE the container build step
+RUN npx prisma generate
 
 # Expose the internal app port
 EXPOSE 8000
