@@ -158,7 +158,7 @@ export type TransferPayload = {
   initiatorUserId: string;
   sender: string;
   receiver?: string; // for internal transfers
-  amount: bigint | number; // smallest unit
+  amount: bigint | number | any; // smallest unit
   currency?: string;
   reason?: string;
 };

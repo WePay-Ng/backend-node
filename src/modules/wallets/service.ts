@@ -19,9 +19,9 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
   } = payload;
 
   console.log(payload);
-
+  const amt = BigInt(Math.round(amount * 100));
   if (!idempotencyKey) throw new CustomError('Missing idempotency key', 400);
-  if (amount <= 0) throw new CustomError('Invalid amount', 400);
+  if (amt <= 0n) throw new CustomError('Invalid amount', 400);
 
   // ------------------------------
   // 1️⃣ Check Idempotency Record
@@ -45,20 +45,15 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
   if (!fromWallet) throw new CustomError('Wallet not found', 404);
 
   const feeRate = Number(process.env.EXTERNAL_PERCENT) ?? 15;
-  const totalAmount = amount + feeRate;
-  console.log('TOTAL AMOUNT', totalAmount);
+  const totalAmount = BigInt(Math.round((amount + feeRate) * 100));
+  console.log('TOTAL AMOUNT1', (amount + feeRate) * 100);
 
   if (Number(fromWallet.availableBalance) < totalAmount)
     throw new CustomError('Insufficient balance', 422);
 
   const transferRecord = await prisma.$transaction(async (tx) => {
     // Check for daily limit
-    const limitExceeded = await checkDailyLimit(
-      tx,
-      fromWallet,
-      fromUser,
-      BigInt(totalAmount),
-    );
+    const limitExceeded = await checkDailyLimit(tx, fromWallet, fromUser, amt);
     if (limitExceeded) throw new CustomError(`Daily limit exceeded.`, 403);
 
     const provider = await prisma.provider.upsert({
@@ -69,14 +64,12 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
       },
     });
 
-    console.log('BIG INT', BigInt(amount));
-
     const transfer = await tx.transfer.create({
       data: {
         idempotencyKey,
         fromWalletId: fromWallet.id,
         toWalletId: '', // temporary, not external wallet
-        amount: BigInt(amount),
+        amount: amt,
         currency,
         initiatedBy: initiatorUserId,
         reason,
@@ -103,7 +96,7 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
           sourceAccountNumber: fromWallet.accountNumber?.trim(),
           sourceAccountName: senderName.trim() ?? 'Wepay User',
           remarks: reason,
-          amount,
+          amount: Number(amt) / 100,
           currency,
           providerId: provider.id,
           initiatedBy: initiatorUserId,
@@ -133,7 +126,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
 
   // TODO:: Check for user wallet amount before transfering
 
-  const amt = BigInt(amount);
+  const amt = BigInt(Math.round(amount * 100));
   if (amt <= 0n) throw new Error('Amount must be positive');
 
   // Resolve sender and recipient
@@ -258,7 +251,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
           transferId: transfer.id,
           fromWalletId: fromWallet.id,
           toWalletId: toWallet.id,
-          amount: amt.toString(),
+          amount: Number(amt) / 100,
           fromUserId: fromUser.id,
           toUserId: toUser.id,
           currency,
@@ -357,7 +350,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
           transferId: transfer.id,
           fromWalletId: fromWallet.id,
           toWalletId: toWallet.id,
-          amount: amt.toString(),
+          amount: Number(amt) / 100,
           currency,
           fromUserId: fromUser.id,
           toUserId: toUser.id,
@@ -371,7 +364,10 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
 
     // return structured result
     return {
-      transferId: transfer.id,
+      transfer: {
+        ...transfer,
+        amount: Number(amt) / 100,
+      },
       journalId: journal.id,
       debitLedgerId: debit.id,
       creditLedgerId: credit.id,
@@ -386,7 +382,7 @@ export async function createWallet(payload: any) {
   const wallet = await prisma.wallet.create({
     data: {
       accountNumber,
-      availableBalance: 20,
+      availableBalance: 0,
       bankCode,
       bankName,
       walletId: '1234567810',

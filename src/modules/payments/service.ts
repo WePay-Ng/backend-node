@@ -7,11 +7,11 @@ export async function airtime(
   payload: {
     idempotencyKey: string;
     number: string;
-    amount: bigint | number | string;
+    amount: bigint | number | string | any;
     country: string;
   },
 ) {
-  const amt = BigInt(payload.amount);
+  const amt = BigInt(Math.round(payload.amount * 100));
   if (amt <= 0n) throw new Error('Amount must be positive');
 
   // idempotency guard
@@ -30,8 +30,6 @@ export async function airtime(
 
   //   Check for sufficient amount here
   const avaiBal = Number(fromWallet.availableBalance);
-  // const resrBal = Number(fromWallet.reservedBalance);
-  console.log(avaiBal, amt);
   if (avaiBal < amt) throw new CustomError('Insufficient balance', 422);
 
   const airtime = await prisma.$transaction(async (tx) => {
@@ -146,7 +144,7 @@ export async function airtime(
           phoneNumber: payload.number,
           network: 'MTN',
           fromWalletId: fromWallet.id,
-          amount: amt.toString(),
+          amount: Number(amt) / 100,
           currency: 'NGN',
           country: payload.country,
         },
@@ -162,5 +160,8 @@ export async function airtime(
   });
 
   await Queue.trigger(airtime.transaction.id, 'AIRTIME');
-  return airtime;
+  return {
+    ...airtime,
+    amount: Number(amt) / 100,
+  };
 }

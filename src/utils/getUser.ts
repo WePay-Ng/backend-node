@@ -18,5 +18,13 @@ export const getUser = async (user: any) => {
 
   return {
     ...authUser,
+    wallets: authUser.wallets.map((w) => {
+      return {
+        ...w,
+        availableBalance: Number(w.availableBalance) / 100,
+        reservedBalance: Number(w.reservedBalance) / 100,
+        ledgerBalance: Number(w.ledgerBalance) / 100,
+      };
+    }),
   };
 };
