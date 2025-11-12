@@ -45,6 +45,7 @@ export const QUEUE_NAMES = {
   TRANSFER: 'transfer',
   AIRTIME: 'airtime',
   NOTIFICATION: 'notification',
+  CREATEWALLET: 'create_wallet',
 } as const;
 
 export async function sendOTP(user: User) {

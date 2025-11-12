@@ -105,28 +105,6 @@ export class Controller {
 
       const updatedUser = await userService.createPin(ID, value);
 
-      if (value?.email && !user.embedlyCustomerId) {
-        const data = {
-          address: user?.address?.streetLine,
-          city: user?.address?.city,
-          country: user?.address?.country,
-          dob: toISODate(user?.dob!),
-          firstName: user?.name?.split(' ')[0],
-          lastName: user?.name?.split(' ')[1],
-          phone: user?.phone,
-          middleName: user?.name?.split(' ')?.[2] ?? '',
-        };
-
-        // TODO: Move this to a Queue
-        limiter.schedule(() =>
-          userService.createEmbedlyUser(user.id, {
-            embedly: data,
-            email: value.email,
-            bvn: user?.bvn?.trim()!,
-          }),
-        );
-      }
-
       return res.status(200).json({
         message: 'User pin added successfully',
         success: true,

@@ -6,6 +6,7 @@ import { processAirtimeEvent } from './process-airtime';
 import { processNotificationsEvent } from './process-notifications';
 import { environment } from '@/config/env';
 import IORedis from 'ioredis';
+import { processEmbedlyWallet } from './process-embedly-wallet';
 
 const redisClient = new IORedis(environment.redis.url, {
   maxRetriesPerRequest: null,
@@ -89,6 +90,26 @@ export class Workers {
           const result = await processNotificationsEvent(data.id, data.data);
           return result;
         } catch (error: any) {
+          throw error;
+        }
+      },
+      {
+        connection: redisClient,
+        concurrency: 5,
+      },
+    );
+  }
+
+  static async walletWorker() {
+    return new Worker(
+      QUEUE_NAMES.CREATEWALLET,
+      async (job) => {
+        const { data } = job;
+        try {
+          const result = await processEmbedlyWallet(data.id);
+          return result;
+        } catch (error: any) {
+          console.log(error, 'WORKER');
           throw error;
         }
       },

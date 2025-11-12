@@ -1,6 +1,7 @@
+import { Embedly } from '@/extensions/embedly';
 import { Queue } from '@/jobs/queues';
 import { prisma } from '@/prisma/client';
-import { ExternalTransferInput, TransferPayload } from '@/types/types';
+import { ExternalTransferInput, iWallet, TransferPayload } from '@/types/types';
 import { DAILY_LIMITS, formatCurrency, formatDate } from '@/utils';
 import CustomError from '@/utils/customError';
 import { Prisma, User, Wallet } from '@prisma/client';
@@ -404,22 +405,24 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
   });
 }
 
-export async function createWallet(payload: any) {
-  const { bankName, bankCode, accountNumber, initiatorUserId } = payload;
+export async function createWallet(payload: iWallet) {
+  const result = await Embedly.wallets.create(payload);
+  if (!result) throw new CustomError('Wallet not creted on embedly', 500);
 
-  const wallet = await prisma.wallet.create({
+  // Create user wallet
+  const userWallet = await prisma.wallet.create({
     data: {
-      accountNumber,
+      accountNumber: result.virtualAccount.accountNumber,
+      bankCode: result.virtualAccount.bankCode,
+      bankName: result.virtualAccount.bankName,
+      walletId: result?.id,
       availableBalance: 0,
-      bankCode,
-      bankName,
-      walletId: '1234567810',
-      userId: initiatorUserId,
-      reservedBalance: 0,
+      ledgerBalance: 0,
+      userId: payload.userId,
     },
   });
 
-  return wallet;
+  return userWallet;
 }
 
 async function checkDailyLimit(

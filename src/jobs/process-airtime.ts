@@ -1,12 +1,6 @@
 import { prisma } from '@/prisma/client';
 import { Akuuk } from '@/extensions/akuuk';
-import Bottleneck from 'bottleneck';
 import { Queue } from './queues';
-
-const limiter = new Bottleneck({
-  maxConcurrent: 1,
-  minTime: 333,
-});
 
 export async function processAirtimeEvent(eventId: any) {
   const event = await prisma.outboxEvent.findFirst({

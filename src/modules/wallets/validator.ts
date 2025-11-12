@@ -23,8 +23,6 @@ export function ValidateExternalTransfer() {
 
 export function ValidateCreateWallet() {
   return Joi.object({
-    bankName: Joi.string().required(),
-    bankCode: Joi.string().required(),
-    accountNumber: Joi.string().required(),
+    currency: Joi.string().optional(),
   });
 }

@@ -58,6 +58,14 @@ export const notificationQueue = new BullQueue(QUEUE_NAMES.NOTIFICATION, {
   },
 });
 
+export const embedlyWalletQueue = new BullQueue(QUEUE_NAMES.CREATEWALLET, {
+  connection: redisClient,
+  defaultJobOptions: {
+    ...defaultJobOptions,
+    attempts: 2,
+  },
+});
+
 export class Queue {
   static async trigger(
     id: string,
@@ -73,6 +81,9 @@ export class Queue {
 
       case 'NOTIFICATION':
         return this.triggerNotification(id, data);
+
+      case 'CREATEWALLET':
+        return this.triggerCreateEmbedlyWallet(id);
       default:
         throw new Error(`Unknown queue type: ${type}`);
     }
@@ -127,8 +138,25 @@ export class Queue {
       status: 'queued',
     };
   }
+
+  private static async triggerCreateEmbedlyWallet(id: string) {
+    const job = await embedlyWalletQueue.add(
+      'process-create-embedly-wallet',
+      { id },
+      {
+        jobId: `wallet-${id}`,
+        priority: 3,
+      },
+    );
+
+    return {
+      jobId: job.id!,
+      status: 'queued',
+    };
+  }
 }
 
 Workers.airtimeWorker();
 Workers.transferWorker();
 Workers.notificationWorker();
+Workers.walletWorker();

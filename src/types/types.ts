@@ -24,7 +24,7 @@ export type EmbedlyInput = {
 };
 
 export type iWallet = {
-  customerId: string;
+  userId: string;
   currency: string;
   name?: string;
 };

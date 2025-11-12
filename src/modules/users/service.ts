@@ -5,7 +5,6 @@ import {
   Bank,
   BVNInput,
   EmbedlyInput,
-  iWallet,
   NextOfKin,
 } from '../../types/types';
 import CustomError from '@/utils/customError';
@@ -13,6 +12,8 @@ import { getUser } from '@/utils/getUser';
 import { Embedly } from '@/extensions/embedly';
 import { Youverify } from '@/extensions/you-verify';
 import { toISODate } from '@/utils';
+import { Queue } from '@/jobs/queues';
+import { createWallet } from '../wallets/service';
 
 export async function update(
   id: string,
@@ -158,12 +159,38 @@ export async function addVerification(id: string, data: any) {
 export async function createPin(id: string, payload: { pin: string }) {
   const hashedPin = await hashPin(payload.pin);
 
-  const user = await prisma.user.update({
-    where: { id },
-    data: {
-      pin: hashedPin,
-    },
+  const user = await prisma.$transaction(async (tx) => {
+    const user = await prisma.user.update({
+      where: { id },
+      data: {
+        pin: hashedPin,
+      },
+      include: { address: true },
+    });
+    console.log(user);
+    if (user.embedlyCustomerId) return user;
+
+    await tx.outboxEvent.create({
+      data: {
+        aggregateId: user.id,
+        topic: 'embedly.user.wallet.creation.initiated',
+        payload: {
+          userId: user.id,
+          streetLine: user?.address?.streetLine,
+          city: user.address?.city,
+          country: user.address?.country,
+          dob: user.dob,
+          name: user.name,
+          phone: user.phone,
+          email: user.email,
+          bvn: user.bvn,
+        },
+      },
+    });
+    return user;
   });
+
+  if (!user.embedlyCustomerId) await Queue.trigger(user.id, 'CREATEWALLET');
 
   return user;
 }
@@ -190,21 +217,23 @@ export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
 
   if (!embedly) return;
 
-  const [verified, wallet] = await Promise.all([
-    Embedly.customers.verifyKYC({
-      bvn: data.bvn,
-      customerId: embedly?.id,
-    }),
-    createWallet({
-      customerId: embedly.id,
-      currency: 'NGN',
-    }),
-    update(userId, {
-      embedlyCustomerId: embedly?.id,
-    }),
-  ]);
+  await update(userId, {
+    embedlyCustomerId: embedly?.id,
+  });
 
-  if (!verified && !wallet) return;
+  const verified = await Embedly.customers.verifyKYC({
+    bvn: data.bvn,
+    customerId: embedly?.id,
+  });
+
+  if (!verified) return;
+
+  const wallet = await createWallet({
+    userId: userId,
+    currency: 'NGN',
+  });
+
+  if (!wallet) return;
 
   await hashBVN(userId, data?.bvn!);
   return wallet;
@@ -238,29 +267,4 @@ export async function getBVNData(value: BVNInput) {
       middleName: data?.middleName,
     },
   };
-}
-
-export async function createWallet(payload: iWallet) {
-  const user = await prisma.user.findFirst({
-    where: { embedlyCustomerId: payload.customerId },
-  });
-  if (!user) throw new CustomError('Customer not found on embedly', 500);
-
-  const result = await Embedly.wallets.create(payload);
-  if (!result) throw new CustomError('Wallet not creted on embedly', 500);
-
-  // Create user wallet
-  const userWallet = await prisma.wallet.create({
-    data: {
-      accountNumber: result.virtualAccount.accountNumber,
-      bankCode: result.virtualAccount.bankCode,
-      bankName: result.virtualAccount.bankName,
-      walletId: result?.id,
-      availableBalance: 0,
-      ledgerBalance: 0,
-      userId: user.id,
-    },
-  });
-
-  return userWallet;
 }
