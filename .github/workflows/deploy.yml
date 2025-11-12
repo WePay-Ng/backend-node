@@ -18,25 +18,19 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.DEPLOY_KEY }}
 
-      - name: Deploy to DigitalOcean
+      - name: Deploy to VM
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
-            set -e
+            ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes $VM_USER@$VM_HOST "
+            if [ -d /${{ secrets.VM_USER }}/wepay-app/.git ]; then
+                cd /${{ secrets.VM_USER }}/wepay-app
+                git fetch --all
+                git reset --hard origin/main
+            else
+                rm -rf /${{ secrets.VM_USER }}/wepay-app
+                git clone git@github.com:Kaperskyguru/wepay.git /${{ secrets.VM_USER }}/wepay-app
+                cd /${{ secrets.VM_USER }}/wepay-app
+            fi
 
-            cd /wepay-app
-
-            echo "Pulling latest code..."
-            git pull origin main
-
-            echo "Installing dependencies..."
-            yarn install --frozen-lockfile
-
-            echo "Generating Prisma client..."
-            npx prisma generate
-
-            echo "Restarting Docker services..."
-            docker compose down
+            docker compose down || true
             docker compose up -d --build
-
-            echo "Deployment complete!"
-          EOF
+            "
