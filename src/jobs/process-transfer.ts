@@ -7,7 +7,7 @@ export async function processTransferEvent(eventId: any) {
   const event = await prisma.outboxEvent.findFirst({
     where: { aggregateId: eventId },
   });
-  console.log(event, 'EVENT');
+
   if (!event) throw new CustomError('Event not found', 404);
 
   const payload = event?.payload as {
@@ -33,7 +33,7 @@ export async function processTransferEvent(eventId: any) {
       sourceAccountName: payload.sourceAccountName,
       remarks: payload.remarks,
     });
-
+    console.log(result, 'RESULT');
     if (!result.succeeded) throw new CustomError('Transfer not succeeded', 500);
 
     const transferRecord = await prisma.$transaction(async (tx) => {
@@ -158,6 +158,7 @@ export async function processTransferEvent(eventId: any) {
 
     return transferRecord;
   } catch (err) {
+    console.log(err, 'ERROR');
     await prisma.transfer.update({
       where: { id: eventId },
       data: {

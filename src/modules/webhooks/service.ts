@@ -1,4 +1,6 @@
+import { Queue } from '@/jobs/queues';
 import { prisma } from '@/prisma/client';
+import { formatCurrency, formatDate } from '@/utils';
 import CustomError from '@/utils/customError';
 
 export async function payout(payload: any) {
@@ -41,8 +43,9 @@ export async function payout(payload: any) {
       where: { accountNumber: payload?.accountNumber },
     });
 
+    const newAmountInKobo = BigInt(Math.round(payload.amount * 100)); //Converted to Kobo
     const newToLedgerBal =
-      BigInt(wallet?.availableBalance as any) - BigInt(payload.amount);
+      BigInt(wallet?.availableBalance as any) - newAmountInKobo;
 
     // TODO: Create a Journal Entry and Ledger debit for the momey leaving
 
@@ -65,7 +68,7 @@ export async function payout(payload: any) {
         walletId: wallet?.id,
         journalId: journal.id,
         transferId: transfer.id,
-        change: -BigInt(payload.amount),
+        change: -newAmountInKobo,
         balanceAfter: newToLedgerBal,
         type: 'TRANSFER_DEBIT',
         metadata: {
@@ -82,13 +85,27 @@ export async function payout(payload: any) {
         ledgerBalance: newToLedgerBal,
         availableBalance: newToLedgerBal,
       },
+      include: { user: true },
     });
 
     // TODO:: NOTIFY USER
+    await Queue.trigger(updatedTransfer?.id, 'NOTIFICATION', {
+      country: updatedWallet.user?.country ?? 'NG',
+      message: `
+        Acct: ******${updatedWallet.accountNumber.slice(-4)}
+        Amt: ${transfer.currency}${formatCurrency(payload.amount)} DR
+        Desc: TRANSFER TO ${payload?.creditAccountName?.toUpperCase()} ${payload?.deliveryStatusMessage?.toUpperCase()}
+        Avail Bal: ${transfer.currency}${formatCurrency(Number(newToLedgerBal) / 100)}
+        Date: ${formatDate(new Date())}`,
+      phone: updatedWallet.user?.phone!,
+      type: 'SMS',
+    });
 
-    const feeRate = Number(process.env.EXTERNAL_PERCENT) ?? 15;
+    const feeRate = BigInt(
+      Math.round(Number(process.env.EXTERNAL_PERCENT) ?? 15) * 100,
+    );
     const newToLedgerBalAfterFee =
-      Number(updatedWallet?.availableBalance) - feeRate;
+      Number(updatedWallet?.availableBalance) - Number(feeRate);
 
     // create JournalEntry
     const feeJournal = await tx.journalEntry.create({
@@ -147,9 +164,9 @@ export async function payout(payload: any) {
     // Add Fee
     await tx.fee.create({
       data: {
-        amount: feeRate,
+        amount: Number(feeRate), //In Kobo,
         currency: transfer.currency,
-        rate: feeRate,
+        rate: Number(feeRate), //In Kobo,
         status: 'SUCCESS',
         provider: metadata?.provideId,
         transactionId: updatedTransfer.id,
@@ -159,6 +176,17 @@ export async function payout(payload: any) {
     });
 
     // TODO:: NOTIFY USER
+    await Queue.trigger(updatedTransfer?.id, 'NOTIFICATION', {
+      country: updatedWallet.user?.country ?? 'NG',
+      message: `
+        Acct: ******${updatedWallet.accountNumber.slice(-4)}
+        Amt: ${transfer.currency}${formatCurrency(Number(feeRate) / 100)} DR
+        Desc: Commission on NIP Transfer
+        Avail Bal: ${transfer.currency}${formatCurrency(Number(newToLedgerBalAfterFee) / 100)}
+        Date: ${formatDate(new Date())}`,
+      phone: updatedWallet.user?.phone!,
+      type: 'SMS',
+    });
 
     await tx.outboxEvent.create({
       data: {
@@ -174,21 +202,20 @@ export async function payout(payload: any) {
     return updatedTransfer;
   });
 
-  //TODO: Trigger Notifications
-
   return transferRecord;
 }
 
 export async function inflow(payload: any) {
   const wallet = await prisma.wallet.findFirst({
     where: { accountNumber: payload?.accountNumber },
+    include: { user: true },
   });
 
   console.log(wallet, 'WALLET');
 
   if (!wallet) throw new CustomError('Wallet not found', 404);
 
-  const transfer = prisma.$transaction(async (tx) => {
+  const transfer = await prisma.$transaction(async (tx) => {
     const provider = await prisma.provider.findFirst({
       where: { provider: 'EMBEDLY' },
     });
@@ -197,7 +224,7 @@ export async function inflow(payload: any) {
       data: {
         provider: 'EMBEDLY',
         fromProviderId: provider?.id,
-        amount: payload.amount,
+        amount: payload.amount * 100,
         currency: 'NGN',
         type: 'EXTERNAL',
         reason: payload.description,
@@ -225,16 +252,16 @@ export async function inflow(payload: any) {
     });
 
     const newToLedgerBal =
-      BigInt(wallet.ledgerBalance as any) + BigInt(payload.amount);
+      BigInt(wallet.ledgerBalance as any) + BigInt(payload.amount * 100);
     const newToAvailable =
-      BigInt(wallet.availableBalance as any) + BigInt(payload.amount);
+      BigInt(wallet.availableBalance as any) + BigInt(payload.amount * 100);
 
     await tx.ledger.create({
       data: {
         walletId: wallet.id,
         journalId: journal.id,
         transferId: transfer.id,
-        change: payload.amount,
+        change: payload.amount * 100,
         balanceAfter: newToLedgerBal,
         type: 'TRANSFER_CREDIT',
         metadata: {
@@ -256,6 +283,19 @@ export async function inflow(payload: any) {
   });
 
   //TODO: Trigger Notifications
+  const newToAvailable =
+    BigInt(wallet.availableBalance as any) + BigInt(payload.amount * 100);
+  await Queue.trigger(transfer?.id, 'NOTIFICATION', {
+    country: wallet.user?.country ?? 'NG',
+    message: `
+        Acct: ******${wallet.accountNumber.slice(-4)}
+        Amt: ${transfer.currency}${formatCurrency(payload.amount)} CR
+        Desc: TRANSFER FROM ${payload?.senderName?.toUpperCase()} ${payload?.description?.toUpperCase()}
+        Avail Bal: ${transfer.currency}${formatCurrency(Number(newToAvailable) / 100)}
+        Date: ${formatDate(new Date())}`,
+    phone: wallet.user?.phone!,
+    type: 'SMS',
+  });
 
   return transfer;
 }

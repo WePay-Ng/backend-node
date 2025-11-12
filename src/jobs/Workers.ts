@@ -5,6 +5,12 @@ import { prisma } from '@/prisma/client';
 import { processAirtimeEvent } from './process-airtime';
 import { processNotificationsEvent } from './process-notifications';
 import { environment } from '@/config/env';
+import IORedis from 'ioredis';
+
+const redisClient = new IORedis(environment.redis.url, {
+  maxRetriesPerRequest: null,
+  enableReadyCheck: false,
+});
 
 const connection = {
   host: environment.redis.host,
@@ -33,7 +39,7 @@ export class Workers {
         }
       },
       {
-        connection,
+        connection: redisClient,
         concurrency: 5,
       },
     );
@@ -68,7 +74,7 @@ export class Workers {
         }
       },
       {
-        connection,
+        connection: redisClient,
         concurrency: 5,
       },
     );
@@ -87,7 +93,7 @@ export class Workers {
         }
       },
       {
-        connection,
+        connection: redisClient,
         concurrency: 5,
       },
     );

@@ -1,7 +1,7 @@
 import { Queue } from '@/jobs/queues';
 import { prisma } from '@/prisma/client';
 import { ExternalTransferInput, TransferPayload } from '@/types/types';
-import { DAILY_LIMITS } from '@/utils';
+import { DAILY_LIMITS, formatCurrency, formatDate } from '@/utils';
 import CustomError from '@/utils/customError';
 import { Prisma, User, Wallet } from '@prisma/client';
 
@@ -110,7 +110,10 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
 
   await Queue.trigger(transferRecord.id, 'TRANSFER');
 
-  return transferRecord;
+  return {
+    ...transferRecord,
+    amount: Number(transferRecord.amount) / 100,
+  };
 }
 
 export async function walletToWalletTransfer(payload: TransferPayload) {
@@ -360,6 +363,31 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
           completedAt: new Date().toISOString(),
         },
       },
+    });
+
+    await Queue.trigger(transfer.id, 'NOTIFICATION', {
+      country: toUser?.country ?? 'NG',
+      message: `
+      Acct: ******${toWallet.accountNumber.slice(-4)}
+      Amt: ${currency}${formatCurrency(Number(amt) / 100)} CR
+      Desc: ${reason?.toUpperCase()}
+      Avail Bal: ${currency}${formatCurrency(Number(newToAvailable) / 100)}
+      Date: ${formatDate(new Date())}`,
+      phone: toUser?.phone!,
+      type: 'SMS',
+    });
+
+    // TODO: This not working
+    await Queue.trigger(transfer.id, 'NOTIFICATION', {
+      country: fromUser?.country ?? 'NG',
+      message: `
+      Acct: ******${fromWallet.accountNumber.slice(-4)}
+      Amt: ${currency}${formatCurrency(Number(amt) / 100)} DR
+      Desc: ${reason?.toUpperCase()}
+      Avail Bal: ${currency}${formatCurrency(Number(newFromAvailable) / 100)}
+      Date: ${formatDate(new Date())}`,
+      phone: fromUser?.phone!,
+      type: 'SMS',
     });
 
     // return structured result

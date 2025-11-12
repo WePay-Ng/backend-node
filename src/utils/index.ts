@@ -124,6 +124,26 @@ export function toISODate(input: string | number | Date): string | null {
   }
 }
 
+export function formatCurrency(amount: any) {
+  return new Intl.NumberFormat('en-NG', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+export function formatDate(date: Date | any) {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0'); // months are 0-indexed
+  const year = date.getFullYear();
+
+  let hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12; // convert 0 → 12 for 12 AM
+
+  return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+}
+
 export function findItem(data: Array<any>, item: string, field: string) {
   return data.find(
     (d) => d?.[field]?.toLowerCase()?.trim() === item?.toLowerCase()?.trim(),
