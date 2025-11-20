@@ -36,7 +36,11 @@ export async function payout(payload: any) {
   const transferRecord = await prisma.$transaction(async (tx) => {
     const updatedTransfer = await tx.transfer.update({
       where: { id: transfer?.id },
-      data: { status: 'COMPLETED', toWalletId: metadata?.provideId },
+      data: {
+        status: 'COMPLETED',
+        toWalletId: metadata?.provideId,
+        shouldRefund: false,
+      },
     });
 
     const wallet = await tx.wallet.findFirst({
@@ -206,12 +210,17 @@ export async function payout(payload: any) {
 }
 
 export async function inflow(payload: any) {
+  // Incase of double webhook
+  const _transfer = await prisma.transfer.findFirst({
+    where: { transactionReference: payload.reference },
+  });
+
+  if (_transfer) return _transfer;
+
   const wallet = await prisma.wallet.findFirst({
     where: { accountNumber: payload?.accountNumber },
     include: { user: true },
   });
-
-  console.log(wallet, 'WALLET');
 
   if (!wallet) throw new CustomError('Wallet not found', 404);
 
@@ -227,8 +236,11 @@ export async function inflow(payload: any) {
         amount: payload.amount * 100,
         currency: 'NGN',
         type: 'EXTERNAL',
+        idempotencyKey: payload?.reference,
+        transactionReference: payload?.reference,
         reason: payload.description,
         status: 'COMPLETED',
+        shouldRefund: false,
         completedAt: new Date().toISOString(),
         metadata: {
           timestamp: new Date().toISOString(),

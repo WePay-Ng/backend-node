@@ -221,7 +221,7 @@ model Airtime {
   currency       String        @default("NGN")
   status         AirtimeStatus @default(PENDING)
   error          String?
-  reference      String?
+  reference      String?       @unique
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @default(now()) @updatedAt
 
@@ -308,7 +308,7 @@ model Transfer {
   provider             String         @default("EMBEDLY")
   amount               BigInt
   shouldRefund         Boolean        @default(true)
-  transactionReference String?
+  transactionReference String?        @unique
   currency             String         @default("NGN")
   status               TransferStatus @default(PENDING)
   initiatedBy          String? // userId who initiated
