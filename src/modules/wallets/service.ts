@@ -37,7 +37,7 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
   // ------------------------------
   const [fromWallet, fromUser] = await Promise.all([
     prisma.wallet.findFirst({
-      where: { userId: initiatorUserId },
+      where: { userId: initiatorUserId, currency },
     }),
     prisma.user.findFirst({ where: { id: initiatorUserId } }),
   ]);

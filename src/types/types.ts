@@ -108,8 +108,8 @@ export type Payment = {
   destinationBank: string;
   destinationAccountNumber: string;
   destinationAccountName: string;
-  sourceAccountNumber: string;
-  sourceAccountName: string;
+  // sourceAccountNumber: string;
+  // sourceAccountName: string;
   remarks: string;
   amount: number;
   currency: string;

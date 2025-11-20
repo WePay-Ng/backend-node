@@ -29,8 +29,6 @@ export async function processTransferEvent(eventId: any) {
       destinationBank: payload.destinationBank,
       destinationAccountNumber: payload.destinationAccountNumber,
       destinationAccountName: payload.destinationAccountName,
-      sourceAccountNumber: payload.sourceAccountNumber,
-      sourceAccountName: payload.sourceAccountName,
       remarks: payload.remarks,
     });
     console.log(result, 'RESULT');

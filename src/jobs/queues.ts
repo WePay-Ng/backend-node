@@ -9,15 +9,6 @@ const redisClient = new IORedis(environment.redis.url, {
   enableReadyCheck: false,
 });
 
-const connection = {
-  host: environment.redis.host,
-  port: environment.redis.port,
-  password: environment.redis.password,
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-  tls: {},
-};
-
 const defaultJobOptions = {
   attempts: 3,
   backoff: {
@@ -41,6 +32,17 @@ export const transferQueue = new BullQueue(QUEUE_NAMES.TRANSFER, {
     attempts: 2,
   },
 });
+
+export const internalTransferQueue = new BullQueue(
+  QUEUE_NAMES.INTERNAL_TRANSFER,
+  {
+    connection: redisClient,
+    defaultJobOptions: {
+      ...defaultJobOptions,
+      attempts: 2,
+    },
+  },
+);
 
 export const airtimeQueue = new BullQueue(QUEUE_NAMES.AIRTIME, {
   connection: redisClient,
@@ -84,6 +86,9 @@ export class Queue {
 
       case 'CREATEWALLET':
         return this.triggerCreateEmbedlyWallet(id);
+
+      case 'INTERNAL_TRANSFER':
+        return this.triggerInternalTransfer(id, data);
       default:
         throw new Error(`Unknown queue type: ${type}`);
     }
@@ -113,6 +118,22 @@ export class Queue {
       { id },
       {
         jobId: `transfer-${id}`,
+        priority: 2,
+      },
+    );
+
+    return {
+      jobId: job.id!,
+      status: 'queued',
+    };
+  }
+
+  private static async triggerInternalTransfer(id: string, data: any) {
+    const job = await transferQueue.add(
+      'process-internal-transfer',
+      { id, data },
+      {
+        jobId: `internal-transfer-${id}`,
         priority: 2,
       },
     );
@@ -160,3 +181,4 @@ Workers.airtimeWorker();
 Workers.transferWorker();
 Workers.notificationWorker();
 Workers.walletWorker();
+Workers.internalTransferWorker();

@@ -45,6 +45,7 @@ export const QUEUE_NAMES = {
   TRANSFER: 'transfer',
   AIRTIME: 'airtime',
   NOTIFICATION: 'notification',
+  INTERNAL_TRANSFER: 'internal_transfer',
   CREATEWALLET: 'create_wallet',
 } as const;
 

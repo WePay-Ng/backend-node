@@ -49,6 +49,9 @@ export interface Environment {
     key: string;
     url: string;
     payoutURL: string;
+    webhookURL: string;
+    orgAccount: number;
+    orgName: string;
   };
   mail: {
     host: string;
@@ -151,6 +154,9 @@ export const environment: Environment = {
     key: process.env.EMBEDLY_KEY as string,
     url: process.env.EMBEDLY_URL as string,
     payoutURL: process.env.EMBEDLY_PAYOUT_URL as string,
+    webhookURL: process.env.EMBEDLY_WEBHOOK_URL as string,
+    orgAccount: Number(process.env.ORGANIZATION_EMBEDLY_ACCOUNT),
+    orgName: process.env.EMBEDLY_ORGANIZATION_NAME as string,
   },
   cloudflare: {
     bucket: process.env.CLOUDFLARE_BUCKET_NAME as string,

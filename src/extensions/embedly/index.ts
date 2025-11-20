@@ -161,7 +161,7 @@ class Wallet {
     const { data: result } = res;
 
     if (result?.code !== '00')
-      throw new CustomError('Failed to retrieve Wallet', 404);
+      throw new CustomError('Failed to retrieve Wallet from Embedly', 404);
 
     return result.data;
   }
@@ -171,12 +171,23 @@ class Wallet {
     const { data: result } = res;
 
     if (result?.code !== '200')
-      throw new CustomError('Failed to retrieve Wallet', 404);
+      throw new CustomError('Failed to retrieve Wallet from Embedly', 404);
 
     return result.data;
   }
 
-  static async transfer(payload: Transfer) {}
+  static async transfer(payload: Transfer) {
+    const res = await Client.put(
+      '/wallets/wallet/transaction/v2/wallet-to-wallet',
+      payload,
+    );
+    const { data: result } = res;
+
+    if (result?.code !== '200')
+      throw new CustomError('Failed to retrieve Wallet from Embedly', 500);
+
+    return result.data;
+  }
 }
 
 class Bank {
@@ -185,13 +196,15 @@ class Bank {
     const { data: result } = res;
 
     if (result?.code !== '200')
-      throw new CustomError('Failed to retrieve Wallet', 404);
+      throw new CustomError('Failed to retrieve Wallet from Embedly', 404);
 
     return result.data;
   }
 
   static async transfer(payload: Payment) {
-    const webhookUrl = `http://localhost:3000/webhooks/embedly/transfers`;
+    const webhookUrl = environment.embedly.webhookURL;
+    const organizationAccount = environment.embedly.orgAccount;
+    const organizationName = environment.embedly.orgName;
 
     const currency = currencies.find((c) => c.shortName == payload.currency);
     const bank = banks.find((b) => b.bankName === payload.destinationBank);
@@ -203,12 +216,14 @@ class Bank {
       webhookUrl,
       currencyId: currency?.id,
       destinationBankCode: bank?.bankCode,
+      sourceAccountNumber: organizationAccount,
+      sourceAccountName: organizationName,
     });
 
     const { data: result } = res;
-
+    console.log(res);
     if (result?.statusCode !== '200')
-      throw new CustomError('Failed to retrieve Wallet', 404);
+      throw new CustomError('Failed to retrieve Wallet from Embedly', 404);
 
     return result;
   }

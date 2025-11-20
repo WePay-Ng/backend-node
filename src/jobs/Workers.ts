@@ -7,6 +7,7 @@ import { processNotificationsEvent } from './process-notifications';
 import { environment } from '@/config/env';
 import IORedis from 'ioredis';
 import { processEmbedlyWallet } from './process-embedly-wallet';
+import { processInternalTransferEvent } from './process-internal-transfers';
 
 const redisClient = new IORedis(environment.redis.url, {
   maxRetriesPerRequest: null,
@@ -35,6 +36,25 @@ export class Workers {
           if (job.attemptsMade === 1) {
             // Use SafeHaven
           }
+        } catch (error: any) {
+          throw error;
+        }
+      },
+      {
+        connection: redisClient,
+        concurrency: 5,
+      },
+    );
+  }
+
+  static async internalTransferWorker() {
+    return new Worker(
+      QUEUE_NAMES.INTERNAL_TRANSFER,
+      async (job) => {
+        const { data } = job;
+        try {
+          const result = await processInternalTransferEvent(data.id, data.data);
+          return result;
         } catch (error: any) {
           throw error;
         }

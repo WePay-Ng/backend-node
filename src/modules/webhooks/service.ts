@@ -1,3 +1,4 @@
+import { environment } from '@/config/env';
 import { Queue } from '@/jobs/queues';
 import { prisma } from '@/prisma/client';
 import { formatCurrency, formatDate } from '@/utils';
@@ -307,6 +308,36 @@ export async function inflow(payload: any) {
         Date: ${formatDate(new Date())}`,
     phone: wallet.user?.phone!,
     type: 'SMS',
+  });
+
+  // Move money from user wallet to organization wallet
+
+  // create outbox event
+  const ref = crypto.randomUUID();
+  await prisma.outboxEvent.create({
+    data: {
+      aggregateId: transfer.id,
+      topic: 'transfer.internal.organization.initiated',
+      payload: {
+        transferId: transfer.id,
+        fromAccount: wallet.accountNumber,
+        toAccount: environment.embedly.orgAccount,
+        remarks: 'Transfer from user wallet to organization wallet',
+        transactionReference: ref,
+        amount: payload.amount,
+        currency: 'NGN',
+        timestamp: new Date().toISOString(),
+      },
+    },
+  });
+
+  // Remove data object from this Queue
+  await Queue.trigger(transfer.id, 'INTERNAL_TRANSFER', {
+    fromAccount: wallet.accountNumber,
+    toAccount: environment.embedly.orgAccount,
+    remarks: 'Transfer from user wallet to organization wallet',
+    transactionReference: ref,
+    amount: payload.amount,
   });
 
   return transfer;
