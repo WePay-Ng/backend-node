@@ -23,8 +23,9 @@ export async function payout(payload: any) {
     const metadata = transfer.metadata as { provideId?: string };
 
     const transferRecord = await prisma.$transaction(async (tx) => {
+      // TODO: Check if you can use decrement in updateWallet instead of quering here
       const wallet = await tx.wallet.findFirst({
-        where: { accountNumber: payload?.debitAccountNumber },
+        where: { id: transfer.fromWalletId! },
         include: { user: true },
       });
 
@@ -38,48 +39,14 @@ export async function payout(payload: any) {
       });
 
       const newAmountInKobo = amountInKobo(payload.amount); //Converted to Kobo
-
       const newToLedgerBal =
         BigInt(wallet?.ledgerBalance as any) - newAmountInKobo;
-
-      // TODO: Create a Journal Entry and Ledger debit for the momey leaving
-
-      const journal = await tx.journalEntry.create({
-        data: {
-          reference: payload.paymentReference,
-          transferId: transfer.id,
-          description: payload.description,
-          postedAt: new Date().toISOString(),
-          metadata: {
-            fromWalletId: wallet?.id,
-            toProvider: 'EMBEDLY',
-          },
-        },
-      });
-
-      // Create Debit Ledger
-      await tx.ledger.create({
-        data: {
-          walletId: wallet?.id,
-          journalId: journal.id,
-          transferId: transfer.id,
-          change: -newAmountInKobo,
-          balanceAfter: newToLedgerBal,
-          type: 'TRANSFER_DEBIT',
-          metadata: {
-            reason: payload.deliveryStatusMessage,
-            fromWalletId: wallet?.id,
-            toProvider: 'EMBEDLY',
-          },
-        },
-      });
 
       const updatedWallet = await tx.wallet.update({
         where: { id: wallet?.id },
         data: {
           ledgerBalance: newToLedgerBal,
         },
-        include: { user: true },
       });
 
       await tx.transaction.update({
@@ -104,7 +71,10 @@ export async function payout(payload: any) {
 
       // FEE Here
       const feeRate = amountInKobo(process.env?.EXTERNAL_PERCENT ?? 15);
+
+      // TODO:: Check this.. It may show incorrect balance in SMS (Because the balance was billed before)
       const newBalAfterFee = BigInt(updatedWallet?.availableBalance) - feeRate;
+
       const newLedgeBalAfterFee =
         BigInt(updatedWallet?.ledgerBalance) - feeRate;
 
@@ -160,8 +130,7 @@ export async function payout(payload: any) {
 
     return transferRecord;
   } catch (error) {
-    console.log(error);
-    const message = error?.message;
+    const message = error?.response?.data?.message ?? error?.message;
 
     // Write Reverse logic
     if (message.includes('Error from Embedly')) {
@@ -190,6 +159,9 @@ export async function payout(payload: any) {
           where: { itemId: transfer?.id },
           data: {
             status: 'REVERSED',
+            metadata: {
+              error: message,
+            },
           },
         });
 
@@ -199,7 +171,7 @@ export async function payout(payload: any) {
             topic: 'transfer.external.embedly.reversed',
             payload: {
               transferId: transfer?.id,
-              error: payload.message,
+              error: message,
               ...payload,
             },
           },
@@ -241,6 +213,7 @@ export async function payout(payload: any) {
         where: { itemId: transfer?.id },
         data: {
           status: 'FAILED',
+          metadata: { error: message },
         },
       });
 
@@ -250,7 +223,7 @@ export async function payout(payload: any) {
           topic: 'transfer.external.embedly.failed',
           payload: {
             transferId: transfer?.id,
-            error: payload.message,
+            error: message,
             ...payload,
           },
         },
