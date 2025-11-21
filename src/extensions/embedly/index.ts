@@ -221,8 +221,7 @@ class Bank {
     });
 
     const { data: result } = res;
-    console.log(res);
-    if (result?.statusCode !== '200')
+    if (result?.code !== '00')
       throw new CustomError('Failed to retrieve Wallet from Embedly', 404);
 
     return result;

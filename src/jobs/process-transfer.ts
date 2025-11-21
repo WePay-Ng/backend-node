@@ -160,13 +160,6 @@ export async function processTransferEvent(eventId: any) {
     });
     if (!user) return transferRecord;
 
-    await Queue.trigger(transferRecord.id, 'NOTIFICATION', {
-      country: user?.country ?? 'NG',
-      message: `You have successfully transfered ${payload.currency}${payload.amount} to ${payload.destinationAccountNumber}`,
-      phone: user.phone,
-      type: 'SMS',
-    });
-
     return transferRecord;
   } catch (err) {
     console.log(err, 'ERROR');
