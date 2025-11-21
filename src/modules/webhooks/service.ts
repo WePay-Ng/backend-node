@@ -160,6 +160,7 @@ export async function payout(payload: any) {
 
     return transferRecord;
   } catch (error) {
+    console.log(error);
     const message = error?.message;
 
     // Write Reverse logic

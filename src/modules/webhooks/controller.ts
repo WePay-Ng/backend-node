@@ -35,17 +35,6 @@ export class Controller {
       if (result.event === 'payout')
         transfer = await webhookService.payout(result?.data);
 
-      await prisma.outboxEvent.create({
-        data: {
-          aggregateId: transfer?.id,
-          topic: 'transfer.external.completed',
-          payload: {
-            transferId: transfer?.id,
-            ...result?.data,
-          },
-        },
-      });
-
       return res.status(200).json({
         status: 'success',
         message: 'Webhook received and verified',
