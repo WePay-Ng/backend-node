@@ -170,7 +170,7 @@ export async function lockWalletsTx(tx: any, walletIds: string[]) {
   return rows;
 }
 
-export function amountInKobo(amount: any) {
+export function amountInKobo(amount: number) {
   return BigInt(Math.round(amount * 100));
 }
 

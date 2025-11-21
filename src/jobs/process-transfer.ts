@@ -3,6 +3,8 @@ import { prisma } from '@/prisma/client';
 import CustomError from '@/utils/customError';
 import { amountInKobo } from '@/utils';
 
+const TXNFEE = process.env.EXTERNAL_PERCENT ?? 15;
+
 export async function processTransferEvent(eventId: any) {
   const event = await prisma.outboxEvent.findFirst({
     where: { aggregateId: eventId },
@@ -34,7 +36,9 @@ export async function processTransferEvent(eventId: any) {
 
     if (!result.succeeded) throw new CustomError('Transfer not succeeded', 500);
 
-    const amount = amountInKobo(payload.amount);
+    const amount = amountInKobo(Number(payload.amount));
+
+    console.log(amount, payload.amount, 'AMOUNT');
 
     const transferRecord = await prisma.$transaction(async (tx) => {
       // Add this transaction to the Provider account
@@ -65,17 +69,17 @@ export async function processTransferEvent(eventId: any) {
       });
       if (!fromWallet) throw new CustomError('From wallet not found', 404);
 
-      const newBalance = BigInt(fromWallet.availableBalance) - amount;
+      const newBalance = BigInt(fromWallet?.availableBalance) - amount;
 
       await tx.wallet.update({
-        where: { id: fromWallet.id },
+        where: { id: fromWallet?.id },
         data: {
           availableBalance: newBalance,
         },
       });
 
       // Debit for FEEs
-      const feeRate = amountInKobo(process.env?.EXTERNAL_PERCENT ?? 15);
+      const feeRate = amountInKobo(Number(TXNFEE));
       const newBalAfterFee = BigInt(fromWallet?.availableBalance) - feeRate;
 
       await tx.wallet.update({

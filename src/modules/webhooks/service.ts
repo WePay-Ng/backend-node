@@ -9,6 +9,8 @@ import {
 } from '@/utils';
 import CustomError from '@/utils/customError';
 
+const TXNFEE = process.env.EXTERNAL_PERCENT ?? 15;
+
 export async function payout(payload: any) {
   try {
     if (payload?.status !== 'Success')
@@ -38,7 +40,7 @@ export async function payout(payload: any) {
         },
       });
 
-      const newAmountInKobo = amountInKobo(payload.amount); //Converted to Kobo
+      const newAmountInKobo = amountInKobo(Number(payload.amount)); //Converted to Kobo
       const newToLedgerBal =
         BigInt(wallet?.ledgerBalance as any) - newAmountInKobo;
 
@@ -70,7 +72,7 @@ export async function payout(payload: any) {
       });
 
       // FEE Here
-      const feeRate = amountInKobo(process.env?.EXTERNAL_PERCENT ?? 15);
+      const feeRate = amountInKobo(Number(TXNFEE));
 
       // TODO:: Check this.. It may show incorrect balance in SMS (Because the balance was billed before)
       const newBalAfterFee = BigInt(updatedWallet?.availableBalance) - feeRate;
@@ -134,8 +136,8 @@ export async function payout(payload: any) {
 
     // Write Reverse logic
     if (message.includes('Error from Embedly')) {
-      const newAmountInKobo = amountInKobo(payload.amount);
-      const newFeeInKobo = amountInKobo(process.env.EXTERNAL_PERCENT ?? 15);
+      const newAmountInKobo = amountInKobo(Number(payload.amount));
+      const newFeeInKobo = amountInKobo(Number(TXNFEE));
 
       const trx = await prisma.$transaction(async (tx) => {
         const transfer = await tx.transfer.findFirst({
@@ -256,7 +258,7 @@ export async function inflow(payload: any) {
       data: {
         provider: 'EMBEDLY',
         fromProviderId: provider?.id,
-        amount: amountInKobo(payload.amount),
+        amount: amountInKobo(Number(payload.amount)),
         currency: 'NGN',
         type: 'EXTERNAL',
         idempotencyKey: payload?.reference,
@@ -287,16 +289,16 @@ export async function inflow(payload: any) {
     });
 
     const newToLedgerBal =
-      BigInt(wallet.ledgerBalance as any) + amountInKobo(payload.amount);
+      BigInt(wallet.ledgerBalance) + amountInKobo(Number(payload.amount));
     const newToAvailable =
-      BigInt(wallet.availableBalance as any) + amountInKobo(payload.amount);
+      BigInt(wallet.availableBalance) + amountInKobo(Number(payload.amount));
 
     await tx.ledger.create({
       data: {
         walletId: wallet.id,
         journalId: journal.id,
         transferId: transfer.id,
-        change: amountInKobo(payload.amount),
+        change: amountInKobo(Number(payload.amount)),
         balanceAfter: newToLedgerBal,
         type: 'TRANSFER_CREDIT',
         metadata: {
@@ -335,7 +337,7 @@ export async function inflow(payload: any) {
 
   //TODO: Trigger Notifications
   const newToAvailable =
-    BigInt(wallet.availableBalance as any) + amountInKobo(payload.amount);
+    BigInt(wallet.availableBalance) + amountInKobo(Number(payload.amount));
   await Queue.trigger(transfer?.id, 'NOTIFICATION', {
     country: wallet.user?.country ?? 'NG',
     message: `
