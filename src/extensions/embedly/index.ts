@@ -182,10 +182,6 @@ class Wallet {
       payload,
     );
     const { data: result } = res;
-
-    if (result?.code !== '200')
-      throw new CustomError('Failed to retrieve Wallet from Embedly', 500);
-
     return result.data;
   }
 }
@@ -207,7 +203,11 @@ class Bank {
     const organizationName = environment.embedly.orgName;
 
     const currency = currencies.find((c) => c.shortName == payload.currency);
-    const bank = banks.find((b) => b.bankName === payload.destinationBank);
+    const bank = banks.find((b) =>
+      b.bankName.toLowerCase().includes(payload.destinationBank.toLowerCase()),
+    );
+
+    if (!bank) throw new CustomError('Bank not found', 404);
 
     const { currency: c, destinationBank, ...rest } = payload;
 
@@ -221,9 +221,6 @@ class Bank {
     });
 
     const { data: result } = res;
-    if (result?.code !== '00')
-      throw new CustomError('Failed to retrieve Wallet from Embedly', 404);
-
     return result;
   }
 }

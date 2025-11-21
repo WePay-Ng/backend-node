@@ -1,3 +1,4 @@
+import { amountInNaira } from '.';
 import CustomError from './customError';
 import { prisma } from '@/prisma/client';
 
@@ -21,9 +22,9 @@ export const getUser = async (user: any) => {
     wallets: authUser.wallets.map((w) => {
       return {
         ...w,
-        availableBalance: Number(w.availableBalance) / 100,
-        reservedBalance: Number(w.reservedBalance) / 100,
-        ledgerBalance: Number(w.ledgerBalance) / 100,
+        availableBalance: amountInNaira(w.availableBalance),
+        reservedBalance: amountInNaira(w.reservedBalance),
+        ledgerBalance: amountInNaira(w.ledgerBalance),
       };
     }),
   };

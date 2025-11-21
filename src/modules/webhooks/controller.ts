@@ -27,6 +27,8 @@ export class Controller {
       const result = req.body;
       let transfer = undefined;
 
+      console.log(result, 'Result -> Webhook');
+
       if (result.event === 'nip')
         transfer = await webhookService.inflow(result?.data);
 

@@ -2,7 +2,13 @@ import { Embedly } from '@/extensions/embedly';
 import { Queue } from '@/jobs/queues';
 import { prisma } from '@/prisma/client';
 import { ExternalTransferInput, iWallet, TransferPayload } from '@/types/types';
-import { DAILY_LIMITS, formatCurrency, formatDate } from '@/utils';
+import {
+  amountInKobo,
+  amountInNaira,
+  DAILY_LIMITS,
+  formatCurrency,
+  formatDate,
+} from '@/utils';
 import CustomError from '@/utils/customError';
 import { Prisma, User, Wallet } from '@prisma/client';
 
@@ -19,8 +25,7 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
     reason = 'Funds Transfer',
   } = payload;
 
-  console.log(payload);
-  const amt = BigInt(Math.round(amount * 100));
+  const amt = amountInKobo(amount);
   if (!idempotencyKey) throw new CustomError('Missing idempotency key', 400);
   if (amt <= 0n) throw new CustomError('Invalid amount', 400);
 
@@ -115,7 +120,7 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
           sourceAccountNumber: fromWallet.accountNumber?.trim(),
           sourceAccountName: senderName.trim(),
           remarks: reason,
-          amount: Number(amt) / 100,
+          amount: amountInNaira(amt),
           currency,
           providerId: provider.id,
           initiatedBy: initiatorUserId,
@@ -131,7 +136,7 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
 
   return {
     ...transferRecord,
-    amount: Number(transferRecord.amount) / 100,
+    amount: amountInNaira(transferRecord.amount),
   };
 }
 
@@ -148,7 +153,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
 
   // TODO:: Check for user wallet amount before transfering
 
-  const amt = BigInt(Math.round(amount * 100));
+  const amt = amountInKobo(amount);
   if (amt <= 0n) throw new Error('Amount must be positive');
 
   // Resolve sender and recipient
@@ -273,7 +278,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
           transferId: transfer.id,
           fromWalletId: fromWallet.id,
           toWalletId: toWallet.id,
-          amount: Number(amt) / 100,
+          amount: amountInNaira(amt),
           fromUserId: fromUser.id,
           toUserId: toUser.id,
           currency,
@@ -372,7 +377,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
           transferId: transfer.id,
           fromWalletId: fromWallet.id,
           toWalletId: toWallet.id,
-          amount: Number(amt) / 100,
+          amount: amountInNaira(amt),
           currency,
           fromUserId: fromUser.id,
           toUserId: toUser.id,
@@ -427,9 +432,9 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
       country: fromUser?.country ?? 'NG',
       message: `
       Acct: ******${fromWallet.accountNumber.slice(-4)}
-      Amt: ${currency}${formatCurrency(Number(amt) / 100)} DR
+      Amt: ${currency}${formatCurrency(amountInNaira(amt))} DR
       Desc: ${reason?.toUpperCase()}
-      Avail Bal: ${currency}${formatCurrency(Number(newFromAvailable) / 100)}
+      Avail Bal: ${currency}${formatCurrency(amountInNaira(newFromAvailable))}
       Date: ${formatDate(new Date())}`,
       phone: fromUser?.phone!,
       type: 'SMS',
@@ -439,7 +444,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
     return {
       transfer: {
         ...transfer,
-        amount: Number(amt) / 100,
+        amount: amountInNaira(amt),
       },
       journalId: journal.id,
       debitLedgerId: debit.id,
@@ -454,9 +459,9 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
     country: toUser?.country ?? 'NG',
     message: `
       Acct: ******${toWallet.accountNumber.slice(-4)}
-      Amt: ${currency}${formatCurrency(Number(amt) / 100)} CR
+      Amt: ${currency}${formatCurrency(amountInNaira(amt))} CR
       Desc: ${reason?.toUpperCase()}
-      Avail Bal: ${currency}${formatCurrency(Number(newToAvailable) / 100)}
+      Avail Bal: ${currency}${formatCurrency(amountInNaira(newToAvailable))}
       Date: ${formatDate(new Date())}`,
     phone: toUser?.phone!,
     type: 'SMS',

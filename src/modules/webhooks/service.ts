@@ -1,10 +1,17 @@
 import { environment } from '@/config/env';
 import { Queue } from '@/jobs/queues';
 import { prisma } from '@/prisma/client';
-import { formatCurrency, formatDate } from '@/utils';
+import {
+  amountInKobo,
+  amountInNaira,
+  formatCurrency,
+  formatDate,
+} from '@/utils';
 import CustomError from '@/utils/customError';
 
 export async function payout(payload: any) {
+  console.log(payload, 'WebHook');
+
   const transfer = await prisma.transfer.findFirst({
     where: { transactionReference: payload.reference },
   });
@@ -56,7 +63,8 @@ export async function payout(payload: any) {
       where: { accountNumber: payload?.accountNumber },
     });
 
-    const newAmountInKobo = BigInt(Math.round(payload.amount * 100)); //Converted to Kobo
+    const newAmountInKobo = amountInKobo(payload.amount); //Converted to Kobo
+
     const newToLedgerBal =
       BigInt(wallet?.availableBalance as any) - newAmountInKobo;
 
@@ -115,7 +123,7 @@ export async function payout(payload: any) {
         Acct: ******${updatedWallet.accountNumber.slice(-4)}
         Amt: ${transfer.currency}${formatCurrency(payload.amount)} DR
         Desc: TRANSFER TO ${payload?.creditAccountName?.toUpperCase()} ${payload?.deliveryStatusMessage?.toUpperCase()}
-        Avail Bal: ${transfer.currency}${formatCurrency(Number(newToLedgerBal) / 100)}
+        Avail Bal: ${transfer.currency}${formatCurrency(amountInNaira(newToLedgerBal))}
         Date: ${formatDate(new Date())}`,
       phone: updatedWallet.user?.phone!,
       type: 'SMS',
@@ -225,9 +233,9 @@ export async function payout(payload: any) {
       country: updatedWallet.user?.country ?? 'NG',
       message: `
         Acct: ******${updatedWallet.accountNumber.slice(-4)}
-        Amt: ${transfer.currency}${formatCurrency(Number(feeRate) / 100)} DR
+        Amt: ${transfer.currency}${formatCurrency(amountInNaira(feeRate))} DR
         Desc: Commission on NIP Transfer
-        Avail Bal: ${transfer.currency}${formatCurrency(Number(newToLedgerBalAfterFee) / 100)}
+        Avail Bal: ${transfer.currency}${formatCurrency(amountInNaira(newToLedgerBalAfterFee))}
         Date: ${formatDate(new Date())}`,
       phone: updatedWallet.user?.phone!,
       type: 'SMS',
@@ -263,7 +271,7 @@ export async function inflow(payload: any) {
       data: {
         provider: 'EMBEDLY',
         fromProviderId: provider?.id,
-        amount: payload.amount * 100,
+        amount: amountInKobo(payload.amount),
         currency: 'NGN',
         type: 'EXTERNAL',
         idempotencyKey: payload?.reference,
@@ -294,16 +302,16 @@ export async function inflow(payload: any) {
     });
 
     const newToLedgerBal =
-      BigInt(wallet.ledgerBalance as any) + BigInt(payload.amount * 100);
+      BigInt(wallet.ledgerBalance as any) + amountInKobo(payload.amount);
     const newToAvailable =
-      BigInt(wallet.availableBalance as any) + BigInt(payload.amount * 100);
+      BigInt(wallet.availableBalance as any) + amountInKobo(payload.amount);
 
     await tx.ledger.create({
       data: {
         walletId: wallet.id,
         journalId: journal.id,
         transferId: transfer.id,
-        change: payload.amount * 100,
+        change: amountInKobo(payload.amount),
         balanceAfter: newToLedgerBal,
         type: 'TRANSFER_CREDIT',
         metadata: {
@@ -342,14 +350,14 @@ export async function inflow(payload: any) {
 
   //TODO: Trigger Notifications
   const newToAvailable =
-    BigInt(wallet.availableBalance as any) + BigInt(payload.amount * 100);
+    BigInt(wallet.availableBalance as any) + amountInKobo(payload.amount);
   await Queue.trigger(transfer?.id, 'NOTIFICATION', {
     country: wallet.user?.country ?? 'NG',
     message: `
         Acct: ******${wallet.accountNumber.slice(-4)}
         Amt: ${transfer.currency}${formatCurrency(payload.amount)} CR
         Desc: TRANSFER FROM ${payload?.senderName?.toUpperCase()} ${payload?.description?.toUpperCase()}
-        Avail Bal: ${transfer.currency}${formatCurrency(Number(newToAvailable) / 100)}
+        Avail Bal: ${transfer.currency}${formatCurrency(amountInNaira(newToAvailable))}
         Date: ${formatDate(new Date())}`,
     phone: wallet.user?.phone!,
     type: 'SMS',

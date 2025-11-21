@@ -8,6 +8,7 @@ router.get('/banks', Controller.getBanks);
 router.get('/:account', Controller.getWalletFromAccount);
 router.post('/transfer', idempotency, Controller.transfer);
 router.post('/', idempotency, Controller.createWallet);
-router.post('/external', Controller.externalTransfer);
+router.post('/external', idempotency, Controller.externalTransfer);
+router.post('/internal', idempotency, Controller.internal);
 
 export default router;

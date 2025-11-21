@@ -13,6 +13,7 @@ import { Embedly } from '@/extensions/embedly';
 import axios from 'axios';
 import { banks } from '@/extensions/embedly/utils';
 import { tryCatch } from 'bullmq';
+import { environment } from '@/config/env';
 
 export class Controller {
   static async transfer(req: Request, res: Response) {
@@ -39,6 +40,34 @@ export class Controller {
         data: transferred,
       });
     } catch (error: any) {
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
+    }
+  }
+
+  static async internal(req: Request, res: Response) {
+    try {
+      const user = req.user;
+      if (!user) throw new CustomError('Unauthorized', 401);
+
+      const { error, value } = ValidateTransfer().validate(req.body);
+      if (error) throw new CustomError(error.details[0].message, 422);
+
+      const transferred = await Embedly.wallets.transfer({
+        amount: value.amount,
+        fromAccount: value.sender,
+        toAccount: environment.embedly.orgAccount + '',
+        transactionReference: crypto.randomUUID(),
+        remarks: value.reason,
+      });
+
+      return res.status(200).json({
+        message: 'Transferred successfully',
+        success: true,
+        data: transferred,
+      });
+    } catch (error: any) {
+      console.log(error);
       const e = useErrorParser(error);
       return res.status(e.status).json(e);
     }

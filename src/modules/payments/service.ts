@@ -1,5 +1,6 @@
 import { Queue } from '@/jobs/queues';
 import { prisma } from '@/prisma/client';
+import { amountInKobo, amountInNaira } from '@/utils';
 import CustomError from '@/utils/customError';
 
 export async function airtime(
@@ -11,7 +12,7 @@ export async function airtime(
     country: string;
   },
 ) {
-  const amt = BigInt(Math.round(payload.amount * 100));
+  const amt = amountInKobo(payload.amount);
   if (amt <= 0n) throw new Error('Amount must be positive');
 
   // idempotency guard
@@ -163,7 +164,7 @@ export async function airtime(
           phoneNumber: payload.number,
           network: 'MTN',
           fromWalletId: fromWallet.id,
-          amount: Number(amt) / 100,
+          amount: amountInNaira(amt),
           currency: 'NGN',
           country: payload.country,
         },
@@ -174,7 +175,7 @@ export async function airtime(
     return {
       transaction: {
         ...transaction,
-        amount: Number(amt) / 100,
+        amount: amountInNaira(amt),
       },
       journalId: journal.id,
       debitLedgerId: debit.id,
@@ -184,6 +185,6 @@ export async function airtime(
   await Queue.trigger(airtime.transaction.id, 'AIRTIME');
   return {
     ...airtime,
-    amount: Number(amt) / 100,
+    amount: amountInNaira(amt),
   };
 }

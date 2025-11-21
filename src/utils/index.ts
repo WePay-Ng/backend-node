@@ -169,3 +169,11 @@ export async function lockWalletsTx(tx: any, walletIds: string[]) {
   // return rows as-is
   return rows;
 }
+
+export function amountInKobo(amount: any) {
+  return BigInt(Math.round(amount * 100));
+}
+
+export function amountInNaira(amount: any) {
+  return Number(amount) / 100;
+}

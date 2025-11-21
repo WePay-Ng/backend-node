@@ -64,7 +64,8 @@ export async function processTransferEvent(eventId: any) {
       if (!fromWallet) throw new CustomError('From wallet not found', 404);
 
       const newBalance =
-        BigInt(fromWallet.availableBalance) - BigInt(payload.amount);
+        BigInt(fromWallet.availableBalance) -
+        BigInt(Math.round((payload.amount as any) * 100));
       await tx.wallet.update({
         where: { id: fromWallet.id },
         data: {
@@ -162,14 +163,12 @@ export async function processTransferEvent(eventId: any) {
 
     return transferRecord;
   } catch (err) {
-    console.log(err, 'ERROR');
-
     await prisma.$transaction(async (tx) => {
       await tx.transfer.update({
         where: { id: eventId },
         data: {
           status: 'FAILED',
-          reason: err.message,
+          reason: err?.response?.data?.message ?? err.message,
         },
       });
 
@@ -181,7 +180,7 @@ export async function processTransferEvent(eventId: any) {
             reason: payload.remarks,
             toBankCode: payload.destinationBank,
             toAccount: payload.destinationAccountNumber,
-            error: err.message,
+            error: err?.response?.data?.message ?? err.message,
           },
         },
       });
@@ -198,7 +197,7 @@ export async function processTransferEvent(eventId: any) {
           toBankCode: payload.destinationBank,
           toAccountNumber: payload.destinationAccountNumber,
           toAccountName: payload.destinationAccountName,
-          error: err.message,
+          error: err?.response?.data?.message ?? err.message,
         },
       },
     });
