@@ -6,6 +6,7 @@ import merchantRoutes from './modules/merchants/routes';
 import webhookRoutes from './modules/webhooks/routes';
 import WalletRoutes from './modules/wallets/routes';
 import PaymentRoutes from './modules/payments/routes';
+import TransactionRoutes from './modules/transactions/routes';
 import { BaseController } from './modules/Controller';
 import Auth from './middleware/auth';
 
@@ -18,6 +19,7 @@ router.use('/agents', Auth, agentRoutes);
 router.use('/merchants', Auth, merchantRoutes);
 router.use('/wallets', Auth, WalletRoutes);
 router.use('/payments', Auth, PaymentRoutes);
+router.use('/transactions', Auth, TransactionRoutes);
 router.post('/uploads/url', Auth, BaseController.generateUploadURL);
 
 export default router;

@@ -12,21 +12,30 @@ export async function payout(payload: any) {
   if (!transfer) throw new CustomError('Transfer not found', 404);
 
   if (payload?.status !== 'Success') {
-    await prisma.transfer.update({
-      where: { id: transfer?.id },
-      data: { status: 'FAILED' },
-    });
+    await prisma.$transaction(async (tx) => {
+      await tx.transfer.update({
+        where: { id: transfer?.id },
+        data: { status: 'FAILED' },
+      });
 
-    await prisma.outboxEvent.create({
-      data: {
-        aggregateId: transfer?.id,
-        topic: 'transfer.external.embedly.failed',
-        payload: {
-          transferId: transfer?.id,
-          error: payload.message,
-          ...payload,
+      await tx.transaction.update({
+        where: { itemId: transfer.id },
+        data: {
+          status: 'FAILED',
         },
-      },
+      });
+
+      await tx.outboxEvent.create({
+        data: {
+          aggregateId: transfer?.id,
+          topic: 'transfer.external.embedly.failed',
+          payload: {
+            transferId: transfer?.id,
+            error: payload.message,
+            ...payload,
+          },
+        },
+      });
     });
 
     throw new CustomError(payload?.message, 500);
@@ -91,6 +100,13 @@ export async function payout(payload: any) {
         availableBalance: newToLedgerBal,
       },
       include: { user: true },
+    });
+
+    await tx.transaction.update({
+      where: { itemId: transfer.id },
+      data: {
+        status: 'COMPLETED',
+      },
     });
 
     // TODO:: NOTIFY USER
@@ -167,7 +183,7 @@ export async function payout(payload: any) {
     });
 
     // Add Fee
-    await tx.fee.create({
+    const fee = await tx.fee.create({
       data: {
         amount: Number(feeRate), //In Kobo,
         currency: transfer.currency,
@@ -180,17 +196,19 @@ export async function payout(payload: any) {
       },
     });
 
-    // TODO:: NOTIFY USER
-    await Queue.trigger(updatedTransfer?.id, 'NOTIFICATION', {
-      country: updatedWallet.user?.country ?? 'NG',
-      message: `
-        Acct: ******${updatedWallet.accountNumber.slice(-4)}
-        Amt: ${transfer.currency}${formatCurrency(Number(feeRate) / 100)} DR
-        Desc: Commission on NIP Transfer
-        Avail Bal: ${transfer.currency}${formatCurrency(Number(newToLedgerBalAfterFee) / 100)}
-        Date: ${formatDate(new Date())}`,
-      phone: updatedWallet.user?.phone!,
-      type: 'SMS',
+    await tx.transaction.create({
+      data: {
+        status: 'COMPLETED',
+        amount: Number(feeRate),
+        itemId: fee.id,
+        type: 'FEE',
+        userId: updatedWallet?.user?.id!,
+        metadata: {
+          currency: transfer.currency,
+          type: 'debit',
+          reason: 'Commission on Nip',
+        },
+      },
     });
 
     await tx.outboxEvent.create({
@@ -202,6 +220,18 @@ export async function payout(payload: any) {
           ...payload,
         },
       },
+    });
+
+    await Queue.trigger(updatedTransfer?.id, 'NOTIFICATION', {
+      country: updatedWallet.user?.country ?? 'NG',
+      message: `
+        Acct: ******${updatedWallet.accountNumber.slice(-4)}
+        Amt: ${transfer.currency}${formatCurrency(Number(feeRate) / 100)} DR
+        Desc: Commission on NIP Transfer
+        Avail Bal: ${transfer.currency}${formatCurrency(Number(newToLedgerBalAfterFee) / 100)}
+        Date: ${formatDate(new Date())}`,
+      phone: updatedWallet.user?.phone!,
+      type: 'SMS',
     });
 
     return updatedTransfer;
@@ -290,6 +320,22 @@ export async function inflow(payload: any) {
         ledgerBalance: newToLedgerBal,
         availableBalance: newToAvailable,
         version: { increment: 1 },
+      },
+    });
+
+    await tx.transaction.create({
+      data: {
+        status: 'COMPLETED',
+        amount: payload.amount,
+        itemId: transfer.id,
+        type: 'DEPOSIT',
+        userId: wallet?.user?.id!,
+        metadata: {
+          currency: transfer.currency,
+          type: 'credit',
+          reason: payload.description,
+          reference: payload?.reference,
+        },
       },
     });
     return transfer;

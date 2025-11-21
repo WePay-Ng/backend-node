@@ -51,6 +51,7 @@ model User {
   intitutionId           String?              @db.Char(36)
   wallets                Wallet[]             @relation("WalletUser")
   Airtime                Airtime[]
+  transactions           transaction[]        @relation("TransactionUser")
 }
 
 model Agent {
@@ -377,6 +378,19 @@ model JournalEntry {
   @@index([reference])
 }
 
+model transaction {
+  id        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
+  userId    String          @db.Char(36)
+  itemId    String          @unique @db.Char(36)
+  user      User            @relation("TransactionUser", fields: [userId], references: [id])
+  type      TransactionType @default(TRANSFER)
+  status    TransferStatus  @default(PENDING)
+  amount    BigInt
+  metadata  Json?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @default(now()) @updatedAt
+}
+
 enum Status {
   ACTIVE
   PENDING
@@ -389,6 +403,7 @@ enum TransferStatus {
   COMPLETED
   FAILED
   CANCELLED
+  REVERSED
 }
 
 enum LedgerType {
@@ -432,4 +447,12 @@ enum FeeType {
   DATA
   EXTERNAL
   AIRTIME
+}
+
+enum TransactionType {
+  AIRTIME
+  DATA
+  TRANSFER
+  DEPOSIT
+  FEE
 }

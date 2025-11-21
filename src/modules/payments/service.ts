@@ -63,6 +63,25 @@ export async function airtime(
       } as any,
     });
 
+    // Create a transaction
+    await tx.transaction.create({
+      data: {
+        amount: -payload?.amount?.toString(),
+        itemId: transaction.id,
+        type: 'AIRTIME',
+        status: 'PENDING',
+        userId,
+        metadata: {
+          type: 'debit',
+          provider: 'AKUUK',
+          currency: 'NGN',
+          network: 'MTN',
+          phoneNumber: payload.number,
+          walletId: fromWallet.id,
+        },
+      },
+    });
+
     // create JournalEntry
     const journal = await tx.journalEntry.create({
       data: {

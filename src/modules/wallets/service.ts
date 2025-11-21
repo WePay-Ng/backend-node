@@ -83,6 +83,24 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
       },
     });
 
+    // Create a transaction
+    await tx.transaction.create({
+      data: {
+        amount: -amount.toString(),
+        itemId: transfer.id,
+        type: 'TRANSFER',
+        status: 'PENDING',
+        userId: initiatorUserId,
+        metadata: {
+          type: 'debit',
+          currency: 'NGN',
+          walletId: fromWallet.id,
+          providerId: provider.id,
+          recipient: `${destinationAccountName}-${destinationAccountNumber}`,
+        },
+      },
+    });
+
     // create outbox event
     await tx.outboxEvent.create({
       data: {
@@ -95,7 +113,7 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
           destinationAccountNumber,
           destinationAccountName,
           sourceAccountNumber: fromWallet.accountNumber?.trim(),
-          sourceAccountName: senderName.trim() ?? 'Wepay User',
+          sourceAccountName: senderName.trim(),
           remarks: reason,
           amount: Number(amt) / 100,
           currency,
@@ -189,7 +207,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
   // canonical order to avoid deadlocks
   const ordered = [fromWallet.id, toWallet.id].sort();
 
-  return prisma.$transaction(async (tx) => {
+  const transfer = await prisma.$transaction(async (tx) => {
     // idempotency guard
 
     const existing = await tx.transfer.findUnique({
@@ -366,16 +384,42 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
       },
     });
 
-    await Queue.trigger(transfer.id, 'NOTIFICATION', {
-      country: toUser?.country ?? 'NG',
-      message: `
-      Acct: ******${toWallet.accountNumber.slice(-4)}
-      Amt: ${currency}${formatCurrency(Number(amt) / 100)} CR
-      Desc: ${reason?.toUpperCase()}
-      Avail Bal: ${currency}${formatCurrency(Number(newToAvailable) / 100)}
-      Date: ${formatDate(new Date())}`,
-      phone: toUser?.phone!,
-      type: 'SMS',
+    // Create a transaction
+    await tx.transaction.create({
+      data: {
+        amount: -amount.toString(),
+        itemId: transfer.id,
+        type: 'TRANSFER',
+        status: 'COMPLETED',
+        userId: initiatorUserId,
+        metadata: {
+          type: 'debit',
+          currency: 'NGN',
+          operationId,
+          walletId: fromWallet.id,
+          toWalletId: toWallet.id,
+          recipient: toUser.name,
+        },
+      },
+    });
+
+    // Create a transaction
+    await tx.transaction.create({
+      data: {
+        amount: amount,
+        itemId: transfer.id,
+        type: 'TRANSFER',
+        status: 'COMPLETED',
+        userId: toUser.id,
+        metadata: {
+          type: 'credit',
+          currency: 'NGN',
+          operationId,
+          walletId: fromWallet.id,
+          toWalletId: toWallet.id,
+          recipient: toUser.name,
+        },
+      },
     });
 
     // TODO: This not working
@@ -401,8 +445,24 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
       debitLedgerId: debit.id,
       creditLedgerId: credit.id,
       status: 'COMPLETED',
+      id: transfer.id,
     };
   });
+
+  const newToAvailable = BigInt(toWallet.availableBalance as any) + amt;
+  await Queue.trigger(transfer.id, 'NOTIFICATION', {
+    country: toUser?.country ?? 'NG',
+    message: `
+      Acct: ******${toWallet.accountNumber.slice(-4)}
+      Amt: ${currency}${formatCurrency(Number(amt) / 100)} CR
+      Desc: ${reason?.toUpperCase()}
+      Avail Bal: ${currency}${formatCurrency(Number(newToAvailable) / 100)}
+      Date: ${formatDate(new Date())}`,
+    phone: toUser?.phone!,
+    type: 'SMS',
+  });
+
+  return transfer;
 }
 
 export async function createWallet(payload: iWallet) {
