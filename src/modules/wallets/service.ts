@@ -5,12 +5,11 @@ import { ExternalTransferInput, iWallet, TransferPayload } from '@/types/types';
 import {
   amountInKobo,
   amountInNaira,
-  DAILY_LIMITS,
+  checkDailyLimit,
   formatCurrency,
   formatDate,
 } from '@/utils';
 import CustomError from '@/utils/customError';
-import { Prisma, User, Wallet } from '@prisma/client';
 
 export async function transferToExternalBank(payload: ExternalTransferInput) {
   const {
@@ -50,19 +49,18 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
   if (!fromUser) throw new CustomError('User not found', 404);
   if (!fromWallet) throw new CustomError('Wallet not found', 404);
 
-  const feeRate = Number(process.env.EXTERNAL_PERCENT) ?? 15;
-  const totalAmount = BigInt(Math.round((amount + feeRate) * 100));
-  console.log('TOTAL AMOUNT1', (amount + feeRate) * 100);
+  const feeRate = Number(process.env?.EXTERNAL_PERCENT ?? 15);
+  const totalAmount = amountInKobo(amount + feeRate);
 
   if (Number(fromWallet.availableBalance) < totalAmount)
     throw new CustomError('Insufficient balance', 422);
 
-  const transferRecord = await prisma.$transaction(async (tx) => {
-    // Check for daily limit
-    const limitExceeded = await checkDailyLimit(tx, fromWallet, fromUser, amt);
-    if (limitExceeded) throw new CustomError(`Daily limit exceeded.`, 403);
+  // Check for daily limit
+  const limitExceeded = await checkDailyLimit(fromWallet, fromUser, amt);
+  if (limitExceeded) throw new CustomError(`Daily limit exceeded.`, 403);
 
-    const provider = await prisma.provider.upsert({
+  const transferRecord = await prisma.$transaction(async (tx) => {
+    const provider = await tx.provider.upsert({
       where: { provider: 'EMBEDLY' },
       update: {},
       create: {
@@ -74,7 +72,6 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
       data: {
         idempotencyKey,
         fromWalletId: fromWallet.id,
-        toWalletId: '', // temporary, not external wallet
         amount: amt,
         currency,
         initiatedBy: initiatorUserId,
@@ -91,7 +88,7 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
     // Create a transaction
     await tx.transaction.create({
       data: {
-        amount: -amount.toString(),
+        amount: -amt.toString(),
         itemId: transfer.id,
         type: 'TRANSFER',
         status: 'PENDING',
@@ -120,7 +117,7 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
           sourceAccountNumber: fromWallet.accountNumber?.trim(),
           sourceAccountName: senderName.trim(),
           remarks: reason,
-          amount: amountInNaira(amt),
+          amount: amount,
           currency,
           providerId: provider.id,
           initiatedBy: initiatorUserId,
@@ -241,14 +238,8 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
     if (available < amt) throw new CustomError('Insufficient funds', 403);
 
     // Check for daily limit
-    const isDailyLimitExceeded = await checkDailyLimit(
-      tx,
-      fromWallet,
-      fromUser,
-      amt,
-    );
-    if (isDailyLimitExceeded)
-      throw new CustomError(`Daily limit exceeded.`, 403);
+    const limitExceeded = await checkDailyLimit(fromWallet, fromUser, amt);
+    if (limitExceeded) throw new CustomError(`Daily limit exceeded.`, 403);
 
     // create Transfer record
     const operationId = `transfer_${payload.idempotencyKey}`;
@@ -488,30 +479,4 @@ export async function createWallet(payload: iWallet) {
   });
 
   return userWallet;
-}
-
-async function checkDailyLimit(
-  tx: Prisma.TransactionClient,
-  fromWallet: Wallet,
-  fromUser: User,
-  amt: bigint,
-) {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
-  const totalTransferredToday = await tx.transfer.aggregate({
-    _sum: { amount: true },
-    where: {
-      fromWalletId: fromWallet.id,
-      createdAt: { gte: todayStart },
-      status: { in: ['PENDING', 'COMPLETED'] },
-    },
-  });
-
-  const transferred = BigInt(totalTransferredToday._sum.amount || 0);
-
-  const tier = fromUser.currentTier as keyof typeof DAILY_LIMITS;
-  const dailyLimit = DAILY_LIMITS[tier] || DAILY_LIMITS.TIER_1;
-
-  return transferred + amt > dailyLimit;
 }

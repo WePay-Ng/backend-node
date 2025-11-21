@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { User } from '@prisma/client';
+import { User, Wallet } from '@prisma/client';
 import { prisma } from '@/prisma/client';
 import otpGenerator from 'otp-generator';
 import sendEmail from '@/extensions/mail-service/send-email';
@@ -176,4 +176,29 @@ export function amountInKobo(amount: any) {
 
 export function amountInNaira(amount: any) {
   return Number(amount) / 100;
+}
+
+export async function checkDailyLimit(
+  fromWallet: Wallet,
+  fromUser: User,
+  amt: bigint,
+) {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const totalTransferredToday = await prisma.transfer.aggregate({
+    _sum: { amount: true },
+    where: {
+      fromWalletId: fromWallet.id,
+      createdAt: { gte: todayStart },
+      status: { in: ['PENDING', 'COMPLETED'] },
+    },
+  });
+
+  const transferred = BigInt(totalTransferredToday._sum.amount || 0);
+
+  const tier = fromUser.currentTier as keyof typeof DAILY_LIMITS;
+  const dailyLimit = DAILY_LIMITS[tier] || DAILY_LIMITS.TIER_1;
+
+  return transferred + amt > dailyLimit;
 }

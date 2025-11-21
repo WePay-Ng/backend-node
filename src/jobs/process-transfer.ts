@@ -34,13 +34,15 @@ export async function processTransferEvent(eventId: any) {
 
     if (!result.succeeded) throw new CustomError('Transfer not succeeded', 500);
 
+    const amount = amountInKobo(payload.amount);
+
     const transferRecord = await prisma.$transaction(async (tx) => {
       // Add this transaction to the Provider account
       const provider = await tx.provider.upsert({
         where: { provider: 'EMBEDLY' },
-        create: { provider: 'EMBEDLY', balance: Number(payload.amount) },
+        create: { provider: 'EMBEDLY', balance: amount },
         update: {
-          balance: { increment: payload.amount.toString() } as any,
+          balance: { increment: amount },
           total: { increment: 1 },
         },
       });
@@ -63,8 +65,8 @@ export async function processTransferEvent(eventId: any) {
       });
       if (!fromWallet) throw new CustomError('From wallet not found', 404);
 
-      const newBalance =
-        BigInt(fromWallet.availableBalance) - amountInKobo(payload.amount);
+      const newBalance = BigInt(fromWallet.availableBalance) - amount;
+
       await tx.wallet.update({
         where: { id: fromWallet.id },
         data: {
@@ -104,7 +106,7 @@ export async function processTransferEvent(eventId: any) {
           walletId: fromWallet.id,
           transferId: transfer.id,
           journalId: journal.id,
-          change: -amountInKobo(payload.amount),
+          change: -amount,
           balanceAfter: newBalance,
           type: 'TRANSFER_DEBIT',
           metadata: {
@@ -120,9 +122,8 @@ export async function processTransferEvent(eventId: any) {
         data: {
           providerId: provider.id,
           journalId: journal.id,
-          change: amountInKobo(payload.amount),
-          balanceAfter:
-            BigInt(provider.balance as any) + amountInKobo(payload.amount),
+          change: amount,
+          balanceAfter: BigInt(provider.balance as any) + amount,
           type: 'TRANSFER_CREDIT',
           metadata: {
             transferId: transfer.id,
