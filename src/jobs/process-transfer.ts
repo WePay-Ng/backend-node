@@ -38,8 +38,6 @@ export async function processTransferEvent(eventId: any) {
 
     const amount = amountInKobo(Number(payload.amount));
 
-    console.log(amount, payload.amount, 'AMOUNT');
-
     const transferRecord = await prisma.$transaction(async (tx) => {
       // Add this transaction to the Provider account
       const provider = await tx.provider.upsert({
@@ -82,12 +80,14 @@ export async function processTransferEvent(eventId: any) {
       const feeRate = amountInKobo(Number(TXNFEE));
       const newBalAfterFee = BigInt(fromWallet?.availableBalance) - feeRate;
 
-      await tx.wallet.update({
+      const w = await tx.wallet.update({
         where: { id: fromWallet?.id },
         data: {
           availableBalance: newBalAfterFee,
         },
       });
+
+      console.log(w, fromWallet, 'WALLETS');
 
       // ============TRANSFER============================
 

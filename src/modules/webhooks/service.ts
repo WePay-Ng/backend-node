@@ -31,6 +31,8 @@ export async function payout(payload: any) {
         include: { user: true },
       });
 
+      console.log(wallet, 'WEBHOOK');
+
       const updatedTransfer = await tx.transfer.update({
         where: { id: transfer?.id },
         data: {
