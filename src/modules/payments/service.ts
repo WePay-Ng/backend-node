@@ -172,7 +172,10 @@ export async function airtime(
 
     // return structured result
     return {
-      transaction,
+      transaction: {
+        ...transaction,
+        amount: Number(amt) / 100,
+      },
       journalId: journal.id,
       debitLedgerId: debit.id,
     };

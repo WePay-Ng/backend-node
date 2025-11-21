@@ -31,7 +31,7 @@ export async function processTransferEvent(eventId: any) {
       destinationAccountName: payload.destinationAccountName,
       remarks: payload.remarks,
     });
-    console.log(result, 'RESULT');
+
     if (!result.succeeded) throw new CustomError('Transfer not succeeded', 500);
 
     const transferRecord = await prisma.$transaction(async (tx) => {
@@ -135,6 +135,19 @@ export async function processTransferEvent(eventId: any) {
             toAccountNumber: payload.destinationAccountNumber,
             toAccountName: payload.destinationAccountName,
             journalId: journal.id,
+          },
+        },
+      });
+
+      // Create a debit transaction
+      await tx.transaction.update({
+        where: { itemId: eventId },
+        data: {
+          status: 'PROCESSING',
+          metadata: {
+            reason: payload.remarks,
+            toBankCode: payload.destinationBank,
+            toAccount: payload.destinationAccountNumber,
           },
         },
       });

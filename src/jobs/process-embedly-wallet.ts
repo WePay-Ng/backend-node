@@ -57,8 +57,6 @@ export async function processEmbedlyWallet(eventId: any) {
 
     return wallet;
   } catch (error) {
-    console.log(error);
-
     await prisma.outboxEvent.create({
       data: {
         aggregateId: eventId,

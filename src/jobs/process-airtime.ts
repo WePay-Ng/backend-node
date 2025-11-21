@@ -60,6 +60,18 @@ export async function processAirtimeEvent(eventId: any) {
         },
       });
 
+      await tx.transaction.update({
+        where: { itemId: eventId },
+        data: {
+          status: 'COMPLETED',
+          metadata: {
+            network: response?.details?.network,
+            competedAt: response?.details?.txnDate ?? new Date().toISOString(),
+            airtimeId: payload.airtimeId,
+          },
+        },
+      });
+
       await prisma.outboxEvent.create({
         data: {
           aggregateId: eventId,
@@ -102,6 +114,18 @@ export async function processAirtimeEvent(eventId: any) {
         },
       });
 
+      await prisma.transaction.update({
+        where: { itemId: eventId },
+        data: {
+          status: 'PROCESSING',
+          metadata: {
+            network: response?.details?.network,
+            competedAt: response?.details?.txnDate ?? new Date().toISOString(),
+            airtimeId: payload.airtimeId,
+          },
+        },
+      });
+
       await prisma.outboxEvent.create({
         data: {
           aggregateId: eventId,
@@ -135,6 +159,18 @@ export async function processAirtimeEvent(eventId: any) {
         data: {
           availableBalance: newUserLedgerBalance,
           ledgerBalance: newUserLedgerBalance,
+        },
+      });
+
+      await prisma.transaction.update({
+        where: { itemId: eventId },
+        data: {
+          status: 'FAILED',
+          metadata: {
+            network: response?.details?.network,
+            competedAt: response?.details?.txnDate ?? new Date().toISOString(),
+            airtimeId: payload.airtimeId,
+          },
         },
       });
     });
