@@ -10,23 +10,234 @@ import {
 import CustomError from '@/utils/customError';
 
 export async function payout(payload: any) {
-  console.log(payload, 'WebHook');
+  try {
+    if (payload?.status !== 'Success')
+      throw new CustomError('Error from Embedly', 500);
 
-  const transfer = await prisma.transfer.findFirst({
-    where: { transactionReference: payload.reference },
-  });
+    const transfer = await prisma.transfer.findFirst({
+      where: { transactionReference: payload.paymentReference },
+    });
 
-  if (!transfer) throw new CustomError('Transfer not found', 404);
+    if (!transfer) throw new CustomError('Transfer not found', 404);
 
-  if (payload?.status !== 'Success') {
+    const metadata = transfer.metadata as { provideId?: string };
+
+    const transferRecord = await prisma.$transaction(async (tx) => {
+      const wallet = await tx.wallet.findFirst({
+        where: { accountNumber: payload?.debitAccountNumber },
+        include: { user: true },
+      });
+
+      const updatedTransfer = await tx.transfer.update({
+        where: { id: transfer?.id },
+        data: {
+          status: 'COMPLETED',
+          toWalletId: metadata?.provideId,
+          shouldRefund: false,
+        },
+      });
+
+      const newAmountInKobo = amountInKobo(payload.amount); //Converted to Kobo
+
+      const newToLedgerBal =
+        BigInt(wallet?.ledgerBalance as any) - newAmountInKobo;
+
+      // TODO: Create a Journal Entry and Ledger debit for the momey leaving
+
+      const journal = await tx.journalEntry.create({
+        data: {
+          reference: payload.paymentReference,
+          transferId: transfer.id,
+          description: payload.description,
+          postedAt: new Date().toISOString(),
+          metadata: {
+            fromWalletId: wallet?.id,
+            toProvider: 'EMBEDLY',
+          },
+        },
+      });
+
+      // Create Debit Ledger
+      await tx.ledger.create({
+        data: {
+          walletId: wallet?.id,
+          journalId: journal.id,
+          transferId: transfer.id,
+          change: -newAmountInKobo,
+          balanceAfter: newToLedgerBal,
+          type: 'TRANSFER_DEBIT',
+          metadata: {
+            reason: payload.deliveryStatusMessage,
+            fromWalletId: wallet?.id,
+            toProvider: 'EMBEDLY',
+          },
+        },
+      });
+
+      const updatedWallet = await tx.wallet.update({
+        where: { id: wallet?.id },
+        data: {
+          ledgerBalance: newToLedgerBal,
+        },
+        include: { user: true },
+      });
+
+      await tx.transaction.update({
+        where: { itemId: transfer.id },
+        data: {
+          status: 'COMPLETED',
+        },
+      });
+
+      // TODO:: NOTIFY USER
+      await Queue.trigger(transfer?.id, 'NOTIFICATION', {
+        country: wallet?.user?.country ?? 'NG',
+        message: `
+        Acct: ******${updatedWallet.accountNumber.slice(-4)}
+        Amt: ${transfer.currency}${formatCurrency(payload.amount)} DR
+        Desc: TRANSFER TO ${payload?.creditAccountName?.toUpperCase()} ${payload?.deliveryStatusMessage?.toUpperCase()}
+        Avail Bal: ${transfer.currency}${formatCurrency(amountInNaira(updatedWallet.availableBalance))}
+        Date: ${formatDate(new Date())}`,
+        phone: wallet?.user?.phone!,
+        type: 'SMS',
+      });
+
+      // FEE Here
+      const feeRate = amountInKobo(process.env?.EXTERNAL_PERCENT ?? 15);
+      const newBalAfterFee = BigInt(updatedWallet?.availableBalance) - feeRate;
+      const newLedgeBalAfterFee =
+        BigInt(updatedWallet?.ledgerBalance) - feeRate;
+
+      await tx.wallet.update({
+        where: { id: wallet?.id },
+        data: {
+          ledgerBalance: newLedgeBalAfterFee,
+        },
+      });
+
+      const fee = await tx.fee.update({
+        where: { transactionId: transfer.id },
+        data: {
+          status: 'COMPLETED',
+        },
+      });
+
+      await tx.transaction.update({
+        where: { itemId: fee.id },
+        data: {
+          status: 'COMPLETED',
+          metadata: {
+            completedAt: new Date().toISOString(),
+          },
+        },
+      });
+
+      await tx.outboxEvent.create({
+        data: {
+          aggregateId: transfer?.id,
+          topic: 'transfer.external.embedly.completed',
+          payload: {
+            transferId: transfer?.id,
+            ...payload,
+          },
+        },
+      });
+
+      await Queue.trigger(transfer?.id, 'NOTIFICATION', {
+        country: wallet?.user?.country ?? 'NG',
+        message: `
+        Acct: ******${updatedWallet.accountNumber.slice(-4)}
+        Amt: ${transfer.currency}${formatCurrency(amountInNaira(feeRate))} DR
+        Desc: Commission on NIP Transfer
+        Avail Bal: ${transfer.currency}${formatCurrency(amountInNaira(newBalAfterFee))}
+        Date: ${formatDate(new Date())}`,
+        phone: wallet?.user?.phone!,
+        type: 'SMS',
+      });
+
+      return updatedTransfer;
+    });
+
+    return transferRecord;
+  } catch (error) {
+    const message = error?.message;
+
+    // Write Reverse logic
+    if (message.includes('Error from Embedly')) {
+      const newAmountInKobo = amountInKobo(payload.amount);
+      const newFeeInKobo = amountInKobo(process.env.EXTERNAL_PERCENT ?? 15);
+
+      const trx = await prisma.$transaction(async (tx) => {
+        const transfer = await tx.transfer.findFirst({
+          where: { transactionReference: payload.paymentReference },
+        });
+        const wallet = await tx.wallet.update({
+          where: { accountNumber: payload?.debitAccountNumber },
+          data: {
+            availableBalance: { increment: newAmountInKobo + newFeeInKobo },
+            ledgerBalance: { increment: newAmountInKobo + newFeeInKobo },
+          },
+          include: { user: true },
+        });
+
+        await tx.transfer.update({
+          where: { id: transfer?.id },
+          data: { status: 'REVERSED' },
+        });
+
+        await tx.transaction.update({
+          where: { itemId: transfer?.id },
+          data: {
+            status: 'REVERSED',
+          },
+        });
+
+        await tx.outboxEvent.create({
+          data: {
+            aggregateId: transfer?.id,
+            topic: 'transfer.external.embedly.reversed',
+            payload: {
+              transferId: transfer?.id,
+              error: payload.message,
+              ...payload,
+            },
+          },
+        });
+
+        return {
+          transfer,
+          wallet,
+        };
+      });
+
+      // Notify user of reversal
+      await Queue.trigger(trx.transfer?.id!, 'NOTIFICATION', {
+        country: trx.wallet?.user?.country ?? 'NG',
+        message: `
+        Acct: ******${trx.wallet.accountNumber.slice(-4)}
+        Amt: ${trx.transfer?.currency}${formatCurrency(payload.amount)} CR
+        Desc: REVERSED: ${payload?.creditAccountName?.toUpperCase()} ${payload?.description?.toUpperCase()}
+        Avail Bal: ${trx.transfer?.currency}${formatCurrency(amountInNaira(trx.wallet.availableBalance))}
+        Date: ${formatDate(new Date())}`,
+        phone: trx.wallet?.user?.phone!,
+        type: 'SMS',
+      });
+
+      return;
+    }
+
     await prisma.$transaction(async (tx) => {
+      const transfer = await tx.transfer.findFirst({
+        where: { transactionReference: payload.paymentReference },
+      });
+
       await tx.transfer.update({
         where: { id: transfer?.id },
         data: { status: 'FAILED' },
       });
 
       await tx.transaction.update({
-        where: { itemId: transfer.id },
+        where: { itemId: transfer?.id },
         data: {
           status: 'FAILED',
         },
@@ -44,207 +255,7 @@ export async function payout(payload: any) {
         },
       });
     });
-    throw new CustomError(payload?.message, 500);
   }
-
-  const metadata = transfer.metadata as { provideId?: string };
-
-  const transferRecord = await prisma.$transaction(async (tx) => {
-    const updatedTransfer = await tx.transfer.update({
-      where: { id: transfer?.id },
-      data: {
-        status: 'COMPLETED',
-        toWalletId: metadata?.provideId,
-        shouldRefund: false,
-      },
-    });
-
-    const wallet = await tx.wallet.findFirst({
-      where: { accountNumber: payload?.accountNumber },
-    });
-
-    const newAmountInKobo = amountInKobo(payload.amount); //Converted to Kobo
-
-    const newToLedgerBal =
-      BigInt(wallet?.availableBalance as any) - newAmountInKobo;
-
-    // TODO: Create a Journal Entry and Ledger debit for the momey leaving
-
-    const journal = await tx.journalEntry.create({
-      data: {
-        reference: payload.reference,
-        transferId: updatedTransfer.id,
-        description: payload.deliveryStatusMessage,
-        postedAt: new Date().toISOString(),
-        metadata: {
-          fromWalletId: wallet?.id,
-          toProvider: 'EMBEDLY',
-        },
-      },
-    });
-
-    // Create Debit Ledger
-    await tx.ledger.create({
-      data: {
-        walletId: wallet?.id,
-        journalId: journal.id,
-        transferId: transfer.id,
-        change: -newAmountInKobo,
-        balanceAfter: newToLedgerBal,
-        type: 'TRANSFER_DEBIT',
-        metadata: {
-          reason: payload.deliveryStatusMessage,
-          fromWalletId: wallet?.id,
-          toProvider: 'EMBEDLY',
-        },
-      },
-    });
-
-    const updatedWallet = await tx.wallet.update({
-      where: { id: wallet?.id },
-      data: {
-        ledgerBalance: newToLedgerBal,
-        availableBalance: newToLedgerBal,
-      },
-      include: { user: true },
-    });
-
-    await tx.transaction.update({
-      where: { itemId: transfer.id },
-      data: {
-        status: 'COMPLETED',
-      },
-    });
-
-    // TODO:: NOTIFY USER
-    await Queue.trigger(updatedTransfer?.id, 'NOTIFICATION', {
-      country: updatedWallet.user?.country ?? 'NG',
-      message: `
-        Acct: ******${updatedWallet.accountNumber.slice(-4)}
-        Amt: ${transfer.currency}${formatCurrency(payload.amount)} DR
-        Desc: TRANSFER TO ${payload?.creditAccountName?.toUpperCase()} ${payload?.deliveryStatusMessage?.toUpperCase()}
-        Avail Bal: ${transfer.currency}${formatCurrency(amountInNaira(newToLedgerBal))}
-        Date: ${formatDate(new Date())}`,
-      phone: updatedWallet.user?.phone!,
-      type: 'SMS',
-    });
-
-    const feeRate = BigInt(
-      Math.round(Number(process.env.EXTERNAL_PERCENT) ?? 15) * 100,
-    );
-    const newToLedgerBalAfterFee =
-      Number(updatedWallet?.availableBalance) - Number(feeRate);
-
-    // create JournalEntry
-    const feeJournal = await tx.journalEntry.create({
-      data: {
-        reference: payload.reference,
-        transferId: updatedTransfer.id,
-        description: 'Commission on Nip',
-        metadata: {
-          fromWalletId: wallet?.id,
-          toProvider: 'EMBEDLY',
-        },
-      },
-    });
-
-    // Create Debit Ledger
-    await tx.ledger.create({
-      data: {
-        walletId: wallet?.id,
-        journalId: feeJournal.id,
-        transferId: transfer.id,
-        change: -feeRate,
-        balanceAfter: newToLedgerBalAfterFee,
-        type: 'FEE',
-        metadata: {
-          reason: 'Commission on Nip',
-          fromWalletId: wallet?.id,
-          toProvider: 'EMBEDLY',
-        },
-      },
-    });
-
-    const feeLedger = await tx.ledger.create({
-      data: {
-        walletId: wallet?.id,
-        journalId: feeJournal.id,
-        transferId: transfer.id,
-        change: feeRate,
-        balanceAfter: newToLedgerBalAfterFee,
-        type: 'FEE',
-        metadata: {
-          reason: 'Commission on Nip',
-          fromWalletId: wallet?.id,
-          toProvider: 'EMBEDLY',
-        },
-      },
-    });
-
-    await tx.wallet.update({
-      where: { id: wallet?.id },
-      data: {
-        ledgerBalance: newToLedgerBalAfterFee,
-        availableBalance: newToLedgerBalAfterFee,
-      },
-    });
-
-    // Add Fee
-    const fee = await tx.fee.create({
-      data: {
-        amount: Number(feeRate), //In Kobo,
-        currency: transfer.currency,
-        rate: Number(feeRate), //In Kobo,
-        status: 'SUCCESS',
-        provider: metadata?.provideId,
-        transactionId: updatedTransfer.id,
-        ledgerId: feeLedger.id,
-        type: 'EXTERNAL',
-      },
-    });
-
-    await tx.transaction.create({
-      data: {
-        status: 'COMPLETED',
-        amount: Number(feeRate),
-        itemId: fee.id,
-        type: 'FEE',
-        userId: updatedWallet?.user?.id!,
-        metadata: {
-          currency: transfer.currency,
-          type: 'debit',
-          reason: 'Commission on Nip',
-        },
-      },
-    });
-
-    await tx.outboxEvent.create({
-      data: {
-        aggregateId: transfer?.id,
-        topic: 'transfer.external.embedly.completed',
-        payload: {
-          transferId: transfer?.id,
-          ...payload,
-        },
-      },
-    });
-
-    await Queue.trigger(updatedTransfer?.id, 'NOTIFICATION', {
-      country: updatedWallet.user?.country ?? 'NG',
-      message: `
-        Acct: ******${updatedWallet.accountNumber.slice(-4)}
-        Amt: ${transfer.currency}${formatCurrency(amountInNaira(feeRate))} DR
-        Desc: Commission on NIP Transfer
-        Avail Bal: ${transfer.currency}${formatCurrency(amountInNaira(newToLedgerBalAfterFee))}
-        Date: ${formatDate(new Date())}`,
-      phone: updatedWallet.user?.phone!,
-      type: 'SMS',
-    });
-
-    return updatedTransfer;
-  });
-
-  return transferRecord;
 }
 
 export async function inflow(payload: any) {

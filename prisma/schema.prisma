@@ -235,7 +235,7 @@ model Airtime {
 
 model Fee {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Char(36)
-  transactionId String   @db.Char(36)
+  transactionId String   @unique @db.Char(36)
   ledgerId      String?  @db.Char(36)
   provider      String?  @db.Char(36)
   type          FeeType  @default(INTERNAL)
@@ -285,7 +285,7 @@ model Wallet {
   currency         String    @default("NGN")
   bankName         String    @db.Char(20)
   bankCode         String    @db.Char(3)
-  accountNumber    String    @db.Char(10)
+  accountNumber    String    @unique @db.Char(10)
   availableBalance BigInt    @default(0)
   ledgerBalance    BigInt    @default(0)
   reservedBalance  BigInt    @default(0) // funds reserved for pending transfers

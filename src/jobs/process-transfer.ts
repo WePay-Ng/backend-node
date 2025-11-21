@@ -1,7 +1,7 @@
 import { Embedly } from '@/extensions/embedly';
 import { prisma } from '@/prisma/client';
 import CustomError from '@/utils/customError';
-import { Queue } from './queues';
+import { amountInKobo } from '@/utils';
 
 export async function processTransferEvent(eventId: any) {
   const event = await prisma.outboxEvent.findFirst({
@@ -64,14 +64,26 @@ export async function processTransferEvent(eventId: any) {
       if (!fromWallet) throw new CustomError('From wallet not found', 404);
 
       const newBalance =
-        BigInt(fromWallet.availableBalance) -
-        BigInt(Math.round((payload.amount as any) * 100));
+        BigInt(fromWallet.availableBalance) - amountInKobo(payload.amount);
       await tx.wallet.update({
         where: { id: fromWallet.id },
         data: {
-          availableBalance: Number(newBalance),
+          availableBalance: newBalance,
         },
       });
+
+      // Debit for FEEs
+      const feeRate = amountInKobo(process.env?.EXTERNAL_PERCENT ?? 15);
+      const newBalAfterFee = BigInt(fromWallet?.availableBalance) - feeRate;
+
+      await tx.wallet.update({
+        where: { id: fromWallet?.id },
+        data: {
+          availableBalance: newBalAfterFee,
+        },
+      });
+
+      // ============TRANSFER============================
 
       // create JournalEntry
       const journal = await tx.journalEntry.create({
@@ -92,7 +104,7 @@ export async function processTransferEvent(eventId: any) {
           walletId: fromWallet.id,
           transferId: transfer.id,
           journalId: journal.id,
-          change: BigInt(-payload.amount),
+          change: -amountInKobo(payload.amount),
           balanceAfter: newBalance,
           type: 'TRANSFER_DEBIT',
           metadata: {
@@ -108,9 +120,9 @@ export async function processTransferEvent(eventId: any) {
         data: {
           providerId: provider.id,
           journalId: journal.id,
-          change: BigInt(payload.amount),
+          change: amountInKobo(payload.amount),
           balanceAfter:
-            BigInt(provider.balance as any) + BigInt(payload.amount),
+            BigInt(provider.balance as any) + amountInKobo(payload.amount),
           type: 'TRANSFER_CREDIT',
           metadata: {
             transferId: transfer.id,
@@ -152,14 +164,91 @@ export async function processTransferEvent(eventId: any) {
           },
         },
       });
+      // ============TRANSFER============================
+
+      // ============FEE============================
+      // create JournalEntry
+      const feeJournal = await tx.journalEntry.create({
+        data: {
+          reference: result.data,
+          transferId: transfer.id,
+          description: 'Commission on Nip',
+          metadata: {
+            fromWalletId: fromWallet?.id,
+            toProvider: 'EMBEDLY',
+          },
+        },
+      });
+
+      // Create Debit Ledger
+      await tx.ledger.create({
+        data: {
+          walletId: fromWallet?.id,
+          journalId: feeJournal.id,
+          transferId: transfer.id,
+          change: -feeRate,
+          balanceAfter: newBalAfterFee,
+          type: 'FEE',
+          metadata: {
+            reason: 'Commission on Nip',
+            fromWalletId: fromWallet?.id,
+            toProvider: 'EMBEDLY',
+            providerId: provider.id,
+          },
+        },
+      });
+
+      // Fee ledger
+      const feeLedger = await tx.ledger.create({
+        data: {
+          walletId: fromWallet?.id,
+          journalId: feeJournal.id,
+          transferId: transfer.id,
+          change: feeRate,
+          balanceAfter: newBalAfterFee,
+          type: 'FEE',
+          metadata: {
+            reason: 'Commission on Nip',
+            fromWalletId: fromWallet?.id,
+            toProvider: 'EMBEDLY',
+            providerId: provider.id,
+          },
+        },
+      });
+
+      // Add Fee
+      const fee = await tx.fee.create({
+        data: {
+          amount: Number(feeRate), //In Kobo,
+          currency: transfer.currency,
+          rate: Number(feeRate), //In Kobo,
+          status: 'PROCESSING',
+          provider: provider.id,
+          transactionId: transfer.id,
+          ledgerId: feeLedger.id,
+          type: 'EXTERNAL',
+        },
+      });
+
+      // Create processing transaction for Fee
+      await tx.transaction.create({
+        data: {
+          status: 'PROCESSING',
+          amount: Number(feeRate),
+          itemId: fee.id,
+          type: 'FEE',
+          userId: payload.initiatedBy,
+          metadata: {
+            currency: transfer.currency,
+            type: 'debit',
+            reason: 'Commission on Nip',
+          },
+        },
+      });
+      // ============FEE============================
 
       return transfer;
     });
-
-    const user = await prisma.user.findFirst({
-      where: { id: payload.initiatedBy },
-    });
-    if (!user) return transferRecord;
 
     return transferRecord;
   } catch (err) {
