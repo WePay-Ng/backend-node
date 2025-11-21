@@ -26,6 +26,7 @@ export async function payout(payload: any) {
 
     const transferRecord = await prisma.$transaction(async (tx) => {
       // TODO: Check if you can use decrement in updateWallet instead of quering here
+      console.log(transfer.fromWalletId!, 'FromWalletID');
       const wallet = await tx.wallet.findFirst({
         where: { id: transfer.fromWalletId! },
         include: { user: true },
@@ -131,6 +132,8 @@ export async function payout(payload: any) {
 
       return updatedTransfer;
     });
+
+    console.log(transferRecord, 'TransferRecord');
 
     return transferRecord;
   } catch (error) {
