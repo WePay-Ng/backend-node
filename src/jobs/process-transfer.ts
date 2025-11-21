@@ -170,14 +170,29 @@ export async function processTransferEvent(eventId: any) {
     return transferRecord;
   } catch (err) {
     console.log(err, 'ERROR');
-    await prisma.transfer.update({
-      where: { id: eventId },
-      data: {
-        status: 'FAILED',
-        reason: err.message,
-      },
-    });
 
+    await prisma.$transaction(async (tx) => {
+      await tx.transfer.update({
+        where: { id: eventId },
+        data: {
+          status: 'FAILED',
+          reason: err.message,
+        },
+      });
+
+      await tx.transaction.update({
+        where: { itemId: eventId },
+        data: {
+          status: 'FAILED',
+          metadata: {
+            reason: payload.remarks,
+            toBankCode: payload.destinationBank,
+            toAccount: payload.destinationAccountNumber,
+            error: err.message,
+          },
+        },
+      });
+    });
     await prisma.outboxEvent.create({
       data: {
         aggregateId: eventId,

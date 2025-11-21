@@ -216,7 +216,7 @@ class Bank {
       webhookUrl,
       currencyId: currency?.id,
       destinationBankCode: bank?.bankCode,
-      sourceAccountNumber: organizationAccount,
+      sourceAccountNumber: organizationAccount + '',
       sourceAccountName: organizationName,
     });
 
