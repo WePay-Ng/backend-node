@@ -69,18 +69,16 @@ export async function processTransferEvent(eventId: any) {
 
       const newBalance = BigInt(fromWallet?.availableBalance) - amount;
 
-      const w = await tx.wallet.update({
+      const wallet = await tx.wallet.update({
         where: { id: fromWallet?.id },
         data: {
           availableBalance: newBalance,
         },
       });
 
-      console.log(w, fromWallet, newBalance, 'WALLETS');
-
       // Debit for FEEs
       const feeRate = amountInKobo(Number(TXNFEE));
-      const newBalAfterFee = BigInt(fromWallet?.availableBalance) - feeRate;
+      const newBalAfterFee = BigInt(wallet?.availableBalance) - feeRate;
 
       await tx.wallet.update({
         where: { id: fromWallet?.id },

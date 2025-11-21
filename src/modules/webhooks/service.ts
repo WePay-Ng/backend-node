@@ -6,6 +6,7 @@ import {
   amountInNaira,
   formatCurrency,
   formatDate,
+  useErrorParser,
 } from '@/utils';
 import CustomError from '@/utils/customError';
 
@@ -13,7 +14,7 @@ const TXNFEE = process.env.EXTERNAL_PERCENT ?? 15;
 
 export async function payout(payload: any) {
   try {
-    if (payload?.status !== 'Success')
+    if (payload?.status?.toLowerCase() !== 'success')
       throw new CustomError('Error from Embedly', 500);
 
     const transfer = await prisma.transfer.findFirst({
@@ -137,7 +138,14 @@ export async function payout(payload: any) {
 
     return transferRecord;
   } catch (error) {
-    const message = error?.response?.data?.message ?? error?.message;
+    let message = error?.response?.data?.message;
+
+    if (!message) {
+      const e = useErrorParser(error);
+      message = e?.message;
+    }
+
+    console.log(message, 'Error');
 
     // Write Reverse logic
     if (message.includes('Error from Embedly')) {
