@@ -129,7 +129,7 @@ export class Queue {
   }
 
   private static async triggerInternalTransfer(id: string, data: any) {
-    const job = await transferQueue.add(
+    const job = await internalTransferQueue.add(
       'process-internal-transfer',
       { id, data },
       {

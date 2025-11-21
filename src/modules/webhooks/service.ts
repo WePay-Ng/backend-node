@@ -37,7 +37,6 @@ export async function payout(payload: any) {
         },
       });
     });
-
     throw new CustomError(payload?.message, 500);
   }
 

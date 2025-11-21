@@ -155,7 +155,7 @@ export const environment: Environment = {
     url: process.env.EMBEDLY_URL as string,
     payoutURL: process.env.EMBEDLY_PAYOUT_URL as string,
     webhookURL: process.env.EMBEDLY_WEBHOOK_URL as string,
-    orgAccount: Number(process.env.ORGANIZATION_EMBEDLY_ACCOUNT),
+    orgAccount: Number(process.env.EMBEDLY_ORGANIZATION_ACCOUNT),
     orgName: process.env.EMBEDLY_ORGANIZATION_NAME as string,
   },
   cloudflare: {
