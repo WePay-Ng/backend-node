@@ -1,5 +1,5 @@
 import { Queue as BullQueue } from 'bullmq';
-import { QUEUE_NAMES } from '@/utils';
+import { generateRandomNumber, QUEUE_NAMES } from '@/utils';
 import { environment } from '@/config/env';
 import { Workers } from './Workers';
 import IORedis from 'ioredis';
@@ -149,7 +149,7 @@ export class Queue {
       'process-notification',
       { id, data },
       {
-        jobId: `notification-${id}`,
+        jobId: `notification-${generateRandomNumber(6)}-${id}`,
         priority: 3,
       },
     );

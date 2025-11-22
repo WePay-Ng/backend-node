@@ -20,6 +20,8 @@ export async function processInternalTransferEvent(
       data: {
         aggregateId: eventId,
         topic: 'transfer.internal.organization.completed',
+        published: true,
+        publishedAt: new Date().toISOString(),
         payload: {
           transferId: eventId,
           fromAccount: data.fromAccount,

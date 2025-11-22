@@ -22,6 +22,7 @@ export async function payout(payload: any) {
     });
 
     if (!transfer) throw new CustomError('Transfer not found', 404);
+    if (['COMPLETED', 'REVERSED'].includes(transfer.status)) return transfer;
 
     const metadata = transfer.metadata as { provideId?: string };
 
@@ -68,7 +69,7 @@ export async function payout(payload: any) {
         message: `
         Acct: ******${updatedWallet.accountNumber.slice(-4)}
         Amt: ${transfer.currency}${formatCurrency(payload.amount)} DR
-        Desc: TRANSFER TO ${payload?.creditAccountName?.toUpperCase()} ${payload?.deliveryStatusMessage?.toUpperCase()}
+        Desc: TRANSFER TO ${payload?.creditAccountName?.toUpperCase()} ${payload?.description?.toUpperCase()}
         Avail Bal: ${transfer.currency}${formatCurrency(amountInNaira(updatedWallet.availableBalance))}
         Date: ${formatDate(new Date())}`,
         phone: wallet?.user?.phone!,
@@ -112,6 +113,8 @@ export async function payout(payload: any) {
         data: {
           aggregateId: transfer?.id,
           topic: 'transfer.external.embedly.completed',
+          published: true,
+          publishedAt: new Date().toISOString(),
           payload: {
             transferId: transfer?.id,
             ...payload,
@@ -184,6 +187,8 @@ export async function payout(payload: any) {
           data: {
             aggregateId: transfer?.id,
             topic: 'transfer.external.embedly.reversed',
+            published: true,
+            publishedAt: new Date().toISOString(),
             payload: {
               transferId: transfer?.id,
               error: message,

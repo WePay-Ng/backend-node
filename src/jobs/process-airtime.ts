@@ -76,6 +76,8 @@ export async function processAirtimeEvent(eventId: any) {
         data: {
           aggregateId: eventId,
           topic: 'airtime.purchase.completed',
+          published: true,
+          publishedAt: new Date().toISOString(),
           payload: {
             airtimeId: payload.airtimeId,
             userId: payload.userId,

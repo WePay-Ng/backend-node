@@ -364,6 +364,8 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
       data: {
         aggregateId: transfer.id,
         topic: 'transfer.completed',
+        published: true,
+        publishedAt: new Date().toISOString(),
         payload: {
           transferId: transfer.id,
           fromWalletId: fromWallet.id,
