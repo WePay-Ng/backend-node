@@ -6,10 +6,10 @@ import {
   amountInKobo,
   amountInNaira,
   checkDailyLimit,
-  formatCurrency,
-  formatDate,
+  formatTransferSMS,
 } from '@/utils';
 import CustomError from '@/utils/customError';
+const MINIMUM_TRANSFER_AMOUNT = 100;
 
 export async function transferToExternalBank(payload: ExternalTransferInput) {
   const {
@@ -27,7 +27,10 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
   const amt = amountInKobo(amount);
   if (!idempotencyKey) throw new CustomError('Missing idempotency key', 400);
   if (amt <= 0n) throw new CustomError('Invalid amount', 400);
-
+  if (amount < MINIMUM_TRANSFER_AMOUNT)
+    throw new Error(
+      `Amount must be equal or greater than ${MINIMUM_TRANSFER_AMOUNT}`,
+    );
   // ------------------------------
   // 1️⃣ Check Idempotency Record
   // ------------------------------
@@ -152,6 +155,10 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
 
   const amt = amountInKobo(amount);
   if (amt <= 0n) throw new Error('Amount must be positive');
+  if (amount < MINIMUM_TRANSFER_AMOUNT)
+    throw new Error(
+      `Amount must be equal or greater than ${MINIMUM_TRANSFER_AMOUNT}`,
+    );
 
   // Resolve sender and recipient
   const [fromWallet, toWallet] = await Promise.all([
@@ -356,7 +363,11 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
     // mark transfer completed
     await tx.transfer.update({
       where: { id: transfer.id },
-      data: { status: 'COMPLETED' as any, completedAt: new Date() },
+      data: {
+        status: 'COMPLETED' as any,
+        completedAt: new Date(),
+        shouldRefund: false,
+      },
     });
 
     // create outbox event
@@ -386,7 +397,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
     await tx.transaction.create({
       data: {
         amount: -amount.toString(),
-        itemId: transfer.id,
+        itemId: debit.id,
         type: 'TRANSFER',
         status: 'COMPLETED',
         userId: initiatorUserId,
@@ -397,6 +408,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
           walletId: fromWallet.id,
           toWalletId: toWallet.id,
           recipient: toUser.name,
+          transferId: transfer.id,
         },
       },
     });
@@ -405,7 +417,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
     await tx.transaction.create({
       data: {
         amount: amount,
-        itemId: transfer.id,
+        itemId: credit.id,
         type: 'TRANSFER',
         status: 'COMPLETED',
         userId: toUser.id,
@@ -416,19 +428,24 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
           walletId: fromWallet.id,
           toWalletId: toWallet.id,
           recipient: toUser.name,
+          transferId: transfer.id,
         },
       },
     });
 
     // TODO: This not working
+    const message = formatTransferSMS({
+      account: fromWallet.accountNumber,
+      amount: amt,
+      currency,
+      desc: reason?.toUpperCase(),
+      balance: newFromAvailable,
+      date: new Date(),
+      type: 'DR',
+    });
     await Queue.trigger(transfer.id, 'NOTIFICATION', {
       country: fromUser?.country ?? 'NG',
-      message: `
-      Acct: ******${fromWallet.accountNumber.slice(-4)}
-      Amt: ${currency}${formatCurrency(amountInNaira(amt))} DR
-      Desc: ${reason?.toUpperCase()}
-      Avail Bal: ${currency}${formatCurrency(amountInNaira(newFromAvailable))}
-      Date: ${formatDate(new Date())}`,
+      message,
       phone: fromUser?.phone!,
       type: 'SMS',
     });
@@ -448,14 +465,20 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
   });
 
   const newToAvailable = BigInt(toWallet.availableBalance as any) + amt;
+
+  const message = formatTransferSMS({
+    account: toWallet.accountNumber,
+    amount: amt,
+    desc: reason?.toUpperCase(),
+    balance: newToAvailable,
+    date: new Date(),
+    currency,
+    type: 'CR',
+  });
+
   await Queue.trigger(transfer.id, 'NOTIFICATION', {
     country: toUser?.country ?? 'NG',
-    message: `
-      Acct: ******${toWallet.accountNumber.slice(-4)}
-      Amt: ${currency}${formatCurrency(amountInNaira(amt))} CR
-      Desc: ${reason?.toUpperCase()}
-      Avail Bal: ${currency}${formatCurrency(amountInNaira(newToAvailable))}
-      Date: ${formatDate(new Date())}`,
+    message,
     phone: toUser?.phone!,
     type: 'SMS',
   });
