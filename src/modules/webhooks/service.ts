@@ -1,13 +1,7 @@
 import { environment } from '@/config/env';
 import { Queue } from '@/jobs/queues';
 import { prisma } from '@/prisma/client';
-import {
-  amountInKobo,
-  amountInNaira,
-  formatCurrency,
-  formatDate,
-  useErrorParser,
-} from '@/utils';
+import { amountInKobo, formatTransferSMS, useErrorParser } from '@/utils';
 import CustomError from '@/utils/customError';
 
 const TXNFEE = process.env.EXTERNAL_PERCENT ?? 15;
@@ -64,14 +58,20 @@ export async function payout(payload: any) {
       });
 
       // TODO:: NOTIFY USER
+
+      const message = formatTransferSMS({
+        account: updatedWallet.accountNumber,
+        amount: payload.amount,
+        type: 'DR',
+        desc: `TRANSFER TO ${payload?.creditAccountName} - ${payload?.description}`.toUpperCase(),
+        currency: transfer.currency,
+        balance: updatedWallet.availableBalance,
+        date: new Date(),
+      });
+
       await Queue.trigger(transfer?.id, 'NOTIFICATION', {
         country: wallet?.user?.country ?? 'NG',
-        message: `
-        Acct: ******${updatedWallet.accountNumber.slice(-4)}
-        Amt: ${transfer.currency}${formatCurrency(payload.amount)} DR
-        Desc: TRANSFER TO ${payload?.creditAccountName?.toUpperCase()} ${payload?.description?.toUpperCase()}
-        Avail Bal: ${transfer.currency}${formatCurrency(amountInNaira(updatedWallet.availableBalance))}
-        Date: ${formatDate(new Date())}`,
+        message,
         phone: wallet?.user?.phone!,
         type: 'SMS',
       });
@@ -122,22 +122,25 @@ export async function payout(payload: any) {
         },
       });
 
+      const feeMessage = formatTransferSMS({
+        account: updatedWallet.accountNumber,
+        amount: feeRate,
+        type: 'DR',
+        desc: `Commission on NIP Transfer`,
+        currency: transfer.currency,
+        balance: newBalAfterFee,
+        date: new Date(),
+      });
+
       await Queue.trigger(transfer?.id, 'NOTIFICATION', {
         country: wallet?.user?.country ?? 'NG',
-        message: `
-        Acct: ******${updatedWallet.accountNumber.slice(-4)}
-        Amt: ${transfer.currency}${formatCurrency(amountInNaira(feeRate))} DR
-        Desc: Commission on NIP Transfer
-        Avail Bal: ${transfer.currency}${formatCurrency(amountInNaira(newBalAfterFee))}
-        Date: ${formatDate(new Date())}`,
+        message: feeMessage,
         phone: wallet?.user?.phone!,
         type: 'SMS',
       });
 
       return updatedTransfer;
     });
-
-    console.log(transferRecord, 'TransferRecord');
 
     return transferRecord;
   } catch (error) {
@@ -147,8 +150,6 @@ export async function payout(payload: any) {
       const e = useErrorParser(error);
       message = e?.message;
     }
-
-    console.log(message, 'Error');
 
     // Write Reverse logic
     if (message.includes('Error from Embedly')) {
@@ -204,14 +205,19 @@ export async function payout(payload: any) {
       });
 
       // Notify user of reversal
+      const message = formatTransferSMS({
+        account: trx.wallet.accountNumber,
+        amount: payload.amount,
+        type: 'CR',
+        desc: `REVERSED: ${payload?.creditAccountName} - ${payload?.description}`.toUpperCase(),
+        currency: trx.transfer?.currency!,
+        balance: trx.wallet.availableBalance,
+        date: new Date(),
+      });
+
       await Queue.trigger(trx.transfer?.id!, 'NOTIFICATION', {
         country: trx.wallet?.user?.country ?? 'NG',
-        message: `
-        Acct: ******${trx.wallet.accountNumber.slice(-4)}
-        Amt: ${trx.transfer?.currency}${formatCurrency(payload.amount)} CR
-        Desc: REVERSED: ${payload?.creditAccountName?.toUpperCase()} ${payload?.description?.toUpperCase()}
-        Avail Bal: ${trx.transfer?.currency}${formatCurrency(amountInNaira(trx.wallet.availableBalance))}
-        Date: ${formatDate(new Date())}`,
+        message,
         phone: trx.wallet?.user?.phone!,
         type: 'SMS',
       });
@@ -356,14 +362,20 @@ export async function inflow(payload: any) {
   //TODO: Trigger Notifications
   const newToAvailable =
     BigInt(wallet.availableBalance) + amountInKobo(Number(payload.amount));
+
+  const message = formatTransferSMS({
+    account: wallet.accountNumber,
+    amount: payload.amount,
+    type: 'CR',
+    desc: `TRANSFER FROM ${payload?.senderName} - ${payload?.description}`.toUpperCase(),
+    currency: transfer.currency,
+    balance: newToAvailable,
+    date: new Date(),
+  });
+
   await Queue.trigger(transfer?.id, 'NOTIFICATION', {
     country: wallet.user?.country ?? 'NG',
-    message: `
-        Acct: ******${wallet.accountNumber.slice(-4)}
-        Amt: ${transfer.currency}${formatCurrency(payload.amount)} CR
-        Desc: TRANSFER FROM ${payload?.senderName?.toUpperCase()} ${payload?.description?.toUpperCase()}
-        Avail Bal: ${transfer.currency}${formatCurrency(amountInNaira(newToAvailable))}
-        Date: ${formatDate(new Date())}`,
+    message,
     phone: wallet.user?.phone!,
     type: 'SMS',
   });
