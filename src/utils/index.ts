@@ -202,3 +202,47 @@ export async function checkDailyLimit(
 
   return transferred + amt > dailyLimit;
 }
+
+function wrapText(text?: string, max = 32) {
+  if (!text) return;
+  const words = text.split(' ');
+  let lines: string[] = [];
+  let current = '';
+
+  for (const w of words) {
+    if ((current + ' ' + w).trim().length > max) {
+      lines.push(current.trim());
+      current = w;
+    } else {
+      current += ' ' + w;
+    }
+  }
+
+  if (current.trim().length > 0) lines.push(current.trim());
+  return lines.join('\n');
+}
+
+export function formatTransferSMS({
+  account,
+  amount,
+  desc,
+  currency,
+  balance,
+  date,
+  type,
+}: {
+  account: string;
+  amount: bigint;
+  desc?: string;
+  currency: string;
+  date: Date;
+  type: string;
+  balance: bigint;
+}) {
+  return `
+Acct: ******${account.slice(-4)}
+Amt: ${currency}${formatCurrency(amountInNaira(amount))} ${type}
+Desc: ${wrapText(desc)}
+Avail Bal: ${currency}${formatCurrency(amountInNaira(balance))}
+Date: ${formatDate(date)}`;
+}
