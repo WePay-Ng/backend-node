@@ -45,12 +45,9 @@ export async function update(
     if (data.occupation !== undefined) record.occupation = data.occupation;
     if (data.education !== undefined) record.education = data.education;
     if (data.religion !== undefined) record.religion = data.religion;
-    if (data.embedlyCustomerId !== undefined)
-      record.embedlyCustomerId = data.embedlyCustomerId;
-    if (data.maritalStatus !== undefined)
-      record.maritalStatus = data.maritalStatus;
-    if (data.emailVerified !== undefined)
-      record.emailVerified = data.emailVerified;
+    if (data.embedlyCustomerId !== undefined) record.embedlyCustomerId = data.embedlyCustomerId;
+    if (data.maritalStatus !== undefined) record.maritalStatus = data.maritalStatus;
+    if (data.emailVerified !== undefined) record.emailVerified = data.emailVerified;
 
     const user = await tx.user.update({
       where: { id },
