@@ -6,6 +6,7 @@ import {
   ValidateForgotPassword,
   ValidateForgotPin,
   ValidateLogin,
+  ValidateLoginWithFinger,
   ValidateRegister,
   ValidateResetPassword,
   ValidateResetPin,
@@ -93,6 +94,26 @@ export class AuthController {
       if (error) throw new Error(error.details[0].message);
 
       const data = await authService.login(value);
+      const token = signAccessToken({ id: data.id });
+      return res.status(200).json({
+        message: 'Login successfully',
+        success: true,
+        data,
+        token,
+      });
+    } catch (error: any) {
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
+    }
+  }
+
+
+  static async fingerLogin(req: Request, res: Response) {
+    try {
+      const { error, value } = ValidateLoginWithFinger().validate(req.body);
+      if (error) throw new Error(error.details[0].message);
+
+      const data = await authService.loginWithFinger(value);
       const token = signAccessToken({ id: data.id });
       return res.status(200).json({
         message: 'Login successfully',

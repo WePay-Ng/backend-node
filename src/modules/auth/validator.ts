@@ -28,6 +28,12 @@ export function ValidateLogin() {
   });
 }
 
+export function ValidateLoginWithFinger() {
+  return Joi.object({
+    fingerPrint: Joi.string().required(),
+  });
+}
+
 export function ValidateResetPassword() {
   return Joi.object({
     newPassword: Joi.string().min(8).required(),

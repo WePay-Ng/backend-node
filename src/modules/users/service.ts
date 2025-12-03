@@ -164,7 +164,7 @@ export async function createPin(id: string, payload: { pin: string }) {
       },
       include: { address: true },
     });
-    console.log(user);
+    
     if (user.embedlyCustomerId) return user;
 
     await tx.outboxEvent.create({

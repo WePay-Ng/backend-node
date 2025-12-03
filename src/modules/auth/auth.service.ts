@@ -91,10 +91,10 @@ export async function register(data: Register) {
 
   if (data?.email !== undefined) record.email = data.email;
 
-  // Hash transaction PIN from payload
-  if (!data.pin) throw new Error('Transaction PIN is required');
-  const pinHash = hashToken(data.pin);
-  record.transactionPin = pinHash;
+  // // Hash transaction PIN from payload
+  // if (!data.pin) throw new Error('Transaction PIN is required');
+  // const pinHash = hashToken(data.pin);
+  // record.transactionPin = pinHash;
 
   const user = await prisma.$transaction(async (tx) => {
     const _user = await tx.user.create({
@@ -213,6 +213,31 @@ export async function login(data: { pin: string }) {
   });
 
   return matchedUser;
+}
+
+
+export async function loginWithFinger(data: { fingerPrint: string }) {
+  const { fingerPrint } = data;
+
+  if (!fingerPrint) {
+    throw new CustomError("Finger is required or invalid finger data", 422);
+  }
+
+  // Find user directly by fingerprint
+  const user = await prisma.user.findFirst({
+    where: { fingerPrint: fingerPrint }
+  });
+
+  if (!user) {
+    throw new CustomError("Invalid fingerprint", 401);
+  }
+
+  // Log successful login
+  await prisma.auditLog.create({
+    data: { userId: user.id, action: "LOGIN" },
+  });
+
+  return user;
 }
 
 
