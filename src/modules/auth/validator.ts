@@ -22,7 +22,8 @@ export function ValidateForgotPin() {
 
 export function ValidateLogin() {
   return Joi.object({
-    phone: Joi.string().required(),
+    phone: Joi.string().optional(),
+    email: Joi.string().email().optional(),
     pin: Joi.string().min(4).max(4).required(),
   });
 }
@@ -36,11 +37,19 @@ export function ValidateResetPassword() {
 export function ValidateResetPin() {
   return Joi.object({
     pin: Joi.string().min(4).max(4).required(),
+    otp: Joi.string().min(6).max(6).required(),
   });
 }
 
 export function ValidateForgotPassword() {
   return Joi.object({
     email: Joi.string().email().required(),
+  });
+}
+
+
+export function VerifyBVN() {
+  return Joi.object({
+    bvn: Joi.string().min(11).max(11).required(),
   });
 }

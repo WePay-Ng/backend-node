@@ -24,6 +24,7 @@ model User {
   religion               String?              @db.VarChar(30)
   maritalStatus          String?              @db.VarChar(20)
   pin                    String?
+  fingerPrint            String?
   status                 Status               @default(ACTIVE)
   isLocked               Boolean              @default(false)
   failedLoginAttempts    Int                  @default(0)

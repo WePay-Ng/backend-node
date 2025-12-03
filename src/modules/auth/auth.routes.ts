@@ -13,6 +13,7 @@ router.patch('/:id/verify', AuthController.verifyOTP);
 router.post('/:id/otp', AuthController.resendOTP);
 router.post('/pin/forgot', AuthController.forgotPin);
 router.put('/pin/reset', AuthController.resetPin);
+router.get('/getBvnDetails', AuthController.getBVNDetails); 
 // Forget Pin
 
 export default router;

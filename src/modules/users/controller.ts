@@ -8,6 +8,7 @@ import {
   ValidateVerification,
   ValidatePin,
   ValidateOTP,
+  ValidateFingerPrint,
 } from './validator';
 import CustomError from '@/utils/customError';
 import { toISODate, useErrorParser } from '@/utils';
@@ -229,4 +230,39 @@ export class Controller {
       return res.status(e.status).json(e);
     }
   }
+
+
+
+  static async captureFingerPrint(req: Request, res: Response) {
+    try {
+      const ID = req.params.id;
+      if (!ID) throw new CustomError('Params is required', 422);
+
+      const { error, value } = ValidateFingerPrint().validate(req.body);
+      if (error) throw new Error(error.details[0].message);
+
+      const user = await prisma.user.findUnique({
+        where: { id: ID },
+        include: { address: true },
+      });
+      if (!user) throw new CustomError('User not found', 500);
+
+      const updatedUser = await userService.captureFingerPrint(ID, value);
+
+      return res.status(200).json({
+        message: 'User finger Print added successfully',
+        success: true,
+        data: updatedUser,
+      });
+    } catch (error: any) {
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
+    }
+  }
+
+
+
+
+
+
 }

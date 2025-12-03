@@ -265,3 +265,20 @@ export async function getBVNData(value: BVNInput) {
     },
   };
 }
+
+
+
+export async function captureFingerPrint(id: string, payload: { fingerPrint: string }) {
+  // Optionally, hash the fingerprint before saving for security
+  const hashedFingerPrint = await hashPin(payload.fingerPrint);
+
+  const user = await prisma.user.update({
+    where: { id },
+    data: {
+      fingerPrint: hashedFingerPrint
+    },
+    include: { address: true },
+  });
+
+  return user;
+}
