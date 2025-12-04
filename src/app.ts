@@ -22,5 +22,9 @@ export const createApp = () => {
   app.use('/api/v1', Routes);
   // app.use(errorHandler);
 
+  app.use((req, res)=>{
+    res.status(404).json({message: "Endpoint not found. please, check the url and try again."})
+  })
+
   return app;
 };

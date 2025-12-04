@@ -45,12 +45,9 @@ export async function update(
     if (data.occupation !== undefined) record.occupation = data.occupation;
     if (data.education !== undefined) record.education = data.education;
     if (data.religion !== undefined) record.religion = data.religion;
-    if (data.embedlyCustomerId !== undefined)
-      record.embedlyCustomerId = data.embedlyCustomerId;
-    if (data.maritalStatus !== undefined)
-      record.maritalStatus = data.maritalStatus;
-    if (data.emailVerified !== undefined)
-      record.emailVerified = data.emailVerified;
+    if (data.embedlyCustomerId !== undefined) record.embedlyCustomerId = data.embedlyCustomerId;
+    if (data.maritalStatus !== undefined) record.maritalStatus = data.maritalStatus;
+    if (data.emailVerified !== undefined) record.emailVerified = data.emailVerified;
 
     const user = await tx.user.update({
       where: { id },
@@ -167,7 +164,7 @@ export async function createPin(id: string, payload: { pin: string }) {
       },
       include: { address: true },
     });
-    console.log(user);
+    
     if (user.embedlyCustomerId) return user;
 
     await tx.outboxEvent.create({
@@ -267,4 +264,21 @@ export async function getBVNData(value: BVNInput) {
       middleName: data?.middleName,
     },
   };
+}
+
+
+
+export async function captureFingerPrint(id: string, payload: { fingerPrint: string }) {
+  // Optionally, hash the fingerprint before saving for security
+  // const hashedFingerPrint = await hashPin(payload.fingerPrint);
+
+  const user = await prisma.user.update({
+    where: { id },
+    data: {
+      fingerPrint: payload.fingerPrint
+    },
+    include: { address: true },
+  });
+
+  return user;
 }

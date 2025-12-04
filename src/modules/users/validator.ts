@@ -92,3 +92,11 @@ export function ValidateVerification() {
     ),
   });
 }
+
+
+
+export function ValidateFingerPrint() {
+  return Joi.object({
+    fingerPrint: Joi.string().required(),
+  });
+}

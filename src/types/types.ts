@@ -3,9 +3,11 @@ export type Register = {
   email?: string;
   bvn: string;
   role: Role;
+  pin: string;
   extra: Record<string, any>;
 };
 export type Login = {
+  email: string;
   phone: string;
   pin: string;
 };
