@@ -45,9 +45,12 @@ export async function update(
     if (data.occupation !== undefined) record.occupation = data.occupation;
     if (data.education !== undefined) record.education = data.education;
     if (data.religion !== undefined) record.religion = data.religion;
-    if (data.embedlyCustomerId !== undefined) record.embedlyCustomerId = data.embedlyCustomerId;
-    if (data.maritalStatus !== undefined) record.maritalStatus = data.maritalStatus;
-    if (data.emailVerified !== undefined) record.emailVerified = data.emailVerified;
+    if (data.embedlyCustomerId !== undefined)
+      record.embedlyCustomerId = data.embedlyCustomerId;
+    if (data.maritalStatus !== undefined)
+      record.maritalStatus = data.maritalStatus;
+    if (data.emailVerified !== undefined)
+      record.emailVerified = data.emailVerified;
 
     const user = await tx.user.update({
       where: { id },
@@ -100,6 +103,46 @@ export async function validateBVN(bvn: string) {
   });
 
   return !!existing;
+}
+
+export async function getUserByPhone(phone: string) {
+  if (!phone) throw new CustomError('Phone Number is required', 422);
+
+  const user = await prisma.user.findFirst({
+    where: { phone: phone },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      name: true,
+      isLocked: true,
+      status: true,
+    },
+  });
+
+  if (!user) throw new CustomError('User not found', 404);
+
+  return user;
+}
+
+export async function getUserByID(ID: string) {
+  if (!ID) throw new CustomError('Wepay ID is required', 422);
+
+  const user = await prisma.user.findFirst({
+    where: { uniqueID: ID },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      name: true,
+      isLocked: true,
+      status: true,
+    },
+  });
+
+  if (!user) throw new CustomError('User not found', 404);
+
+  return user;
 }
 
 export async function addPassword(id: string, password: string) {
@@ -164,7 +207,7 @@ export async function createPin(id: string, payload: { pin: string }) {
       },
       include: { address: true },
     });
-    
+
     if (user.embedlyCustomerId) return user;
 
     await tx.outboxEvent.create({
@@ -266,16 +309,17 @@ export async function getBVNData(value: BVNInput) {
   };
 }
 
-
-
-export async function captureFingerPrint(id: string, payload: { fingerPrint: string }) {
+export async function captureFingerPrint(
+  id: string,
+  payload: { fingerPrint: string },
+) {
   // Optionally, hash the fingerprint before saving for security
   // const hashedFingerPrint = await hashPin(payload.fingerPrint);
 
   const user = await prisma.user.update({
     where: { id },
     data: {
-      fingerPrint: payload.fingerPrint
+      fingerPrint: payload.fingerPrint,
     },
     include: { address: true },
   });

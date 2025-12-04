@@ -12,6 +12,8 @@ router.patch('/:id/credentials', Controller.setCredentials);
 router.post('/:id/verification', Controller.addVerification);
 router.post('/:id/pin', Controller.createPin);
 router.post('/:id/verify', Auth, Controller.verifyPin);
-router.post('/:id/fingerPrint', Controller.captureFingerPrint);
+router.post('/:id/fingerprint', Controller.captureFingerPrint);
+router.post('/phone', Controller.verifyUserByPhone);
+router.post('/id', Controller.verifyUserByUniqueId);
 
 export default router;

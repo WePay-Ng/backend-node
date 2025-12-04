@@ -9,6 +9,8 @@ import {
   ValidatePin,
   ValidateOTP,
   ValidateFingerPrint,
+  ValidateUniqueID,
+  ValidatePhone,
 } from './validator';
 import CustomError from '@/utils/customError';
 import { toISODate, useErrorParser } from '@/utils';
@@ -19,9 +21,6 @@ const limiter = new Bottleneck({
   maxConcurrent: 1,
   minTime: 333,
 });
-
-// Apply to this job
-// https://harakaxyz.notion.site/job-senior-backend-eng
 
 export class Controller {
   static async setCredentials(req: Request, res: Response) {
@@ -86,6 +85,42 @@ export class Controller {
       if (e.message.includes('(`email`)'))
         return res.status(e.status).json({ message: 'Email already exist' });
 
+      return res.status(e.status).json(e);
+    }
+  }
+
+  static async verifyUserByPhone(req: Request, res: Response) {
+    try {
+      const { error, value } = ValidatePhone().validate(req.body);
+      if (error) throw new Error(error.details[0].message);
+
+      const user = await userService.getUserByPhone(value.phone);
+
+      return res.status(200).json({
+        message: 'User verified successfully',
+        success: true,
+        data: user,
+      });
+    } catch (error: any) {
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
+    }
+  }
+
+  static async verifyUserByUniqueId(req: Request, res: Response) {
+    try {
+      const { error, value } = ValidateUniqueID().validate(req.body);
+      if (error) throw new Error(error.details[0].message);
+
+      const user = await userService.getUserByID(value.id);
+
+      return res.status(200).json({
+        message: 'User verified successfully',
+        success: true,
+        data: user,
+      });
+    } catch (error: any) {
+      const e = useErrorParser(error);
       return res.status(e.status).json(e);
     }
   }
@@ -231,8 +266,6 @@ export class Controller {
     }
   }
 
-
-
   static async captureFingerPrint(req: Request, res: Response) {
     try {
       const ID = req.params.id;
@@ -259,10 +292,4 @@ export class Controller {
       return res.status(e.status).json(e);
     }
   }
-
-
-
-
-
-
 }

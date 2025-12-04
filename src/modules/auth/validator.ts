@@ -53,7 +53,6 @@ export function ValidateForgotPassword() {
   });
 }
 
-
 export function VerifyBVN() {
   return Joi.object({
     bvn: Joi.string().min(11).max(11).required(),

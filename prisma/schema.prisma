@@ -12,6 +12,7 @@ model User {
   email                  String?              @unique
   password               String?              @db.VarChar(60)
   name                   String?
+  uniqueID               String?              @db.VarChar(8)
   embedlyCustomerId      String?              @db.Char(36)
   country                String?              @db.VarChar(100)
   bvn                    String?              @db.VarChar(64)

@@ -16,8 +16,11 @@ export function fileDirName(meta: any) {
 }
 
 export const useErrorParser = (err: { message: string; status: number }) => {
+  console.log(err);
   return {
-    message: err.message ?? 'Internal Server Error',
+    message: err.message.includes('prisma')
+      ? 'Internal Server Error'
+      : (err?.message ?? 'Internal Server Error'),
     status: err?.status ?? 500,
     success: false,
   };

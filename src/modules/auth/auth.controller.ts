@@ -69,7 +69,6 @@ export class AuthController {
     }
   }
 
-
   static async getBVNDetails(req: Request, res: Response) {
     try {
       const { error, value } = VerifyBVN().validate(req.body);
@@ -78,10 +77,9 @@ export class AuthController {
       const payload = await userService.getBVNData(value);
 
       return res.status(200).json({
-        message: "BVN details retrieved successfully",
+        message: 'BVN details retrieved successfully',
         data: payload,
       });
-
     } catch (error: any) {
       const e = useErrorParser(error);
       return res.status(e.status).json(e);
@@ -107,8 +105,7 @@ export class AuthController {
     }
   }
 
-
-  static async fingerLogin(req: Request, res: Response) {
+  static async loginWithFingerPrint(req: Request, res: Response) {
     try {
       const { error, value } = ValidateLoginWithFinger().validate(req.body);
       if (error) throw new Error(error.details[0].message);
@@ -208,7 +205,6 @@ export class AuthController {
   //   }
   // }
 
-
   static async resetPin(req: Request, res: Response) {
     try {
       const user = req?.user;
@@ -221,36 +217,34 @@ export class AuthController {
 
       // 1️⃣ Ensure OTP was provided
       if (!otp) {
-        throw new CustomError("OTP is required to reset PIN", 422);
+        throw new CustomError('OTP is required to reset PIN', 422);
       }
 
       // 2️⃣ Validate OTP
       const record: any = {};
-      if (!isDev() && otp !== "222222") record.refreshCode = otp;
+      if (!isDev() && otp !== '222222') record.refreshCode = otp;
 
       const otpRecord = await prisma.verificationIntent.findFirst({
         where: { refreshCode: otp, ...record },
       });
 
       if (!otpRecord) {
-        throw new CustomError("Invalid or expired OTP", 422);
+        throw new CustomError('Invalid or expired OTP', 422);
       }
 
       // 3️⃣ Reset PIN
       const data = await authService.resetPin(user, { pin });
 
       return res.status(200).json({
-        message: "PIN reset successfully",
+        message: 'PIN reset successfully',
         success: true,
         data,
       });
-
     } catch (error: any) {
       const e = useErrorParser(error);
       return res.status(e.status).json(e);
     }
   }
-
 
   static async verifyOTP(req: Request, res: Response) {
     try {
@@ -258,7 +252,10 @@ export class AuthController {
       const id = req.params.id;
 
       if (!code && !dob) {
-        throw new CustomError("Either OTP code or date of birth is required", 422);
+        throw new CustomError(
+          'Either OTP code or date of birth is required',
+          422,
+        );
       }
 
       let verified = false; // track if user passed verification
@@ -269,7 +266,7 @@ export class AuthController {
       if (code) {
         const record: Record<string, unknown> = {};
 
-        if (!isDev() && code !== "222222") {
+        if (!isDev() && code !== '222222') {
           record.refreshCode = code;
         }
 
@@ -277,13 +274,13 @@ export class AuthController {
           where: { userId: id, ...record },
         });
 
-        if (!verification) throw new CustomError("Invalid OTP", 422);
+        if (!verification) throw new CustomError('Invalid OTP', 422);
 
         // OTP matched → delete all OTPs
         limiter.schedule(() =>
           prisma.verificationIntent.deleteMany({
             where: { userId: id },
-          })
+          }),
         );
 
         verified = true;
@@ -294,20 +291,23 @@ export class AuthController {
       // ---------------------------
       if (!verified) {
         const userRecord = await prisma.user.findUnique({ where: { id } });
-        if (!userRecord) throw new CustomError("User not found", 404);
+        if (!userRecord) throw new CustomError('User not found', 404);
 
         if (!userRecord.dob)
-          throw new CustomError("User does not have a registered date of birth", 400);
+          throw new CustomError(
+            'User does not have a registered date of birth',
+            400,
+          );
 
         // Normalize both dates to YYYY-MM-DD
         const formatDate = (v: string | Date) =>
-          new Date(v).toISOString().split("T")[0];
+          new Date(v).toISOString().split('T')[0];
 
         const dbDob = formatDate(userRecord.dob);
         const inputDob = formatDate(dob);
 
         if (dbDob !== inputDob) {
-          throw new CustomError("Date of birth does not match", 422);
+          throw new CustomError('Date of birth does not match', 422);
         }
 
         verified = true;
@@ -315,7 +315,7 @@ export class AuthController {
 
       // Should never fail here, but safety check
       if (!verified) {
-        throw new CustomError("Verification failed", 500);
+        throw new CustomError('Verification failed', 500);
       }
 
       // ---------------------------
@@ -324,18 +324,15 @@ export class AuthController {
       const updatedUser = await userService.update(id, { emailVerified: true });
 
       return res.status(200).json({
-        msg: "Verify Successful",
+        message: 'Verify Successful',
         success: true,
         data: await getUser(updatedUser),
       });
-
     } catch (error) {
       const e = useErrorParser(error);
       return res.status(e.status).json(e);
     }
   }
-
-
 
   static async resendOTP(req: Request, res: Response) {
     try {
@@ -343,7 +340,7 @@ export class AuthController {
       await authService.resendOTP(id);
 
       return res.status(200).json({
-        msg: 'OTP Sent Successful',
+        message: 'OTP Sent Successful',
         success: true,
       });
     } catch (error) {
