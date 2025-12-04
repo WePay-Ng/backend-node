@@ -10,6 +10,7 @@ import {
   ValidateRegister,
   ValidateResetPassword,
   ValidateResetPin,
+  ValidateUpdatePin,
   VerifyBVN,
 } from './validator';
 import CustomError from '@/utils/customError';
@@ -207,8 +208,8 @@ export class AuthController {
 
   static async resetPin(req: Request, res: Response) {
     try {
-      const user = req?.user;
-      if (!user) throw new CustomError('Unauthorized', 402);
+      // const user = req?.user;
+      // if (!user) throw new CustomError('Unauthorized', 402);
 
       const { error, value } = ValidateResetPin().validate(req.body);
       if (error) throw new CustomError(error.details[0].message, 422);
@@ -232,11 +233,40 @@ export class AuthController {
         throw new CustomError('Invalid or expired OTP', 422);
       }
 
+      const user: any = await prisma.user.findFirst({
+        where: { id: otpRecord.userId },
+      })
+
       // 3️⃣ Reset PIN
       const data = await authService.resetPin(user, { pin });
 
       return res.status(200).json({
         message: 'PIN reset successfully',
+        success: true,
+        data,
+      });
+    } catch (error: any) {
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
+    }
+  }
+
+
+  static async updatePin(req: Request, res: Response) {
+    try {
+      const user = req?.user;
+      if (!user) throw new CustomError('Unauthorized', 402);
+
+      const { error, value } = ValidateUpdatePin().validate(req.body);
+      if (error) throw new CustomError(error.details[0].message, 422);
+
+      const { pin } = value;
+
+      // 3️⃣ Reset PIN
+      const data = await authService.resetPin(user, { pin });
+
+      return res.status(200).json({
+        message: 'PIN updatedd successfully',
         success: true,
         data,
       });

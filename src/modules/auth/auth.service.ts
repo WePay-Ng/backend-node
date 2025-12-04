@@ -9,6 +9,7 @@ import { User } from '@prisma/client';
 import Bottleneck from 'bottleneck';
 import { sendOTP } from '@/utils';
 import CustomError from '@/utils/customError';
+import { generateUserSafeId } from '@/utils/helpers';
 
 const limiter = new Bottleneck({
   maxConcurrent: 1,
@@ -86,11 +87,14 @@ export async function register(data: Register) {
 
   if (data?.email !== undefined) record.email = data.email;
 
+  const uniqueId = generateUserSafeId();
+
   const user = await prisma.$transaction(async (tx) => {
     const _user = await tx.user.create({
       data: {
         bvn: data.bvn, //Hashing will come when user add emails,
         ...record,
+        uniqueID: uniqueId,
       },
       include: { address: true },
     });
@@ -209,12 +213,15 @@ export async function forgotPassword(data: { email: string; ip?: string }) {
 }
 
 export async function resetPassword(data: ResetPassword) {
-  const user = await prisma.user.findUnique({ where: { email: data.email } });
-  if (!user) throw new Error('Invalid or expired token');
+  const { token, newPassword, ip } = data;
+  const verificationIntent = await prisma.verificationIntent.findFirst({
+    where: { refreshCode: token }
+  });
+  if (!verificationIntent) throw new Error('Invalid or expired token');
 
-  const newHash = await hashPassword(data.newPassword);
-  await prisma.user.update({
-    where: { id: user.id },
+  const newHash = await hashPassword(newPassword);
+  const user = await prisma.user.update({
+    where: { id: verificationIntent.userId },
     data: {
       password: newHash,
     },
@@ -223,7 +230,7 @@ export async function resetPassword(data: ResetPassword) {
   // revoke all refresh tokens (safety)
   await prisma.verificationIntent.deleteMany({ where: { userId: user.id } });
   await prisma.auditLog.create({
-    data: { userId: user.id, action: 'RESET_PASSWORD', ip: data.ip },
+    data: { userId: user.id, action: 'RESET_PASSWORD', ip: ip },
   });
   return user;
 }

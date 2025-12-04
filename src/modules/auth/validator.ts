@@ -36,6 +36,7 @@ export function ValidateLoginWithFinger() {
 
 export function ValidateResetPassword() {
   return Joi.object({
+    token: Joi.string().min(6).max(6).required(),
     newPassword: Joi.string().min(8).required(),
   });
 }
@@ -44,6 +45,13 @@ export function ValidateResetPin() {
   return Joi.object({
     pin: Joi.string().min(4).max(4).required(),
     otp: Joi.string().min(6).max(6).required(),
+  });
+}
+
+
+export function ValidateUpdatePin() {
+  return Joi.object({
+    pin: Joi.string().min(4).max(4).required()
   });
 }
 

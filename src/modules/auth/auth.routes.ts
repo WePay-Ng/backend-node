@@ -14,6 +14,7 @@ router.patch('/:id/verify', AuthController.verifyOTP);
 router.post('/:id/otp', AuthController.resendOTP);
 router.post('/pin/forgot', AuthController.forgotPin);
 router.put('/pin/reset', AuthController.resetPin);
+router.put('/pin/update', AuthController.updatePin);
 router.get('/bvn', AuthController.getBVNDetails);
 // Forget Pin
 
