@@ -9,7 +9,7 @@ import { User } from '@prisma/client';
 import Bottleneck from 'bottleneck';
 import { sendOTP } from '@/utils';
 import CustomError from '@/utils/customError';
-import { generateUserSafeId } from '@/utils/helpers';
+import { generateUserSafeId } from '@/utils/uniqueIdGenerator';
 
 const limiter = new Bottleneck({
   maxConcurrent: 1,
