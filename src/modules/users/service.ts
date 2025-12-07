@@ -199,38 +199,35 @@ export async function addVerification(id: string, data: any) {
 export async function createPin(id: string, payload: { pin: string }) {
   const hashedPin = await hashPin(payload.pin);
 
-  const user = await prisma.$transaction(async (tx) => {
-    const user = await prisma.user.update({
-      where: { id },
-      data: {
-        pin: hashedPin,
-      },
-      include: { address: true },
-    });
-
-    if (user.embedlyCustomerId) return user;
-
-    await tx.outboxEvent.create({
-      data: {
-        aggregateId: user.id,
-        topic: 'embedly.user.wallet.creation.initiated',
-        payload: {
-          userId: user.id,
-          streetLine: user?.address?.streetLine,
-          city: user.address?.city,
-          country: user.address?.country,
-          dob: user.dob,
-          name: user.name,
-          phone: user.phone,
-          email: user.email,
-          bvn: user.bvn,
-        },
-      },
-    });
-    return user;
+  const user = await prisma.user.update({
+    where: { id },
+    data: {
+      pin: hashedPin,
+    },
+    include: { address: true },
   });
 
-  if (!user.embedlyCustomerId) await Queue.trigger(user.id, 'CREATEWALLET');
+  if (user.embedlyCustomerId && !user?.address?.streetLine) return user;
+
+  // Trigger wallet creation
+  await prisma.outboxEvent.create({
+    data: {
+      aggregateId: user.id,
+      topic: 'embedly.user.wallet.creation.initiated',
+      payload: {
+        userId: user.id,
+        streetLine: user?.address?.streetLine,
+        city: user.address?.city,
+        country: user.address?.country,
+        dob: user.dob,
+        name: user.name,
+        phone: user.phone,
+        email: user.email,
+        bvn: user.bvn,
+      },
+    },
+  });
+  await Queue.trigger(user.id, 'CREATEWALLET');
 
   return user;
 }
@@ -270,7 +267,7 @@ export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
 
   const wallet = await createWallet({
     userId: userId,
-    currency: 'NGN',
+    currency: data?.extra?.currency ?? 'NGN',
   });
 
   if (!wallet) return;
