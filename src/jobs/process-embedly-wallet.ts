@@ -13,12 +13,12 @@ export async function processEmbedlyWallet(eventId: any) {
   const payload = event?.payload as {
     userId: string;
     streetLine: string;
-    city?: string;
-    country?: string;
-    dob?: string;
-    name?: string;
-    phone?: string;
-    email?: string;
+    city: string;
+    country: string;
+    dob: string;
+    name: string;
+    phone: string;
+    email: string;
     bvn: string;
   };
   try {
@@ -40,8 +40,6 @@ export async function processEmbedlyWallet(eventId: any) {
       email: payload.email,
       bvn: payload?.bvn?.trim()!,
     });
-
-    console.log(wallet);
 
     await prisma.outboxEvent.create({
       data: {

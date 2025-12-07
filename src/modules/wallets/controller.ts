@@ -108,7 +108,7 @@ export class Controller {
       if (!user) throw new CustomError('Unauthorized', 401);
 
       const { error, value } = ValidateCreateWallet().validate(req.body);
-      console.log(value);
+
       if (error) throw new CustomError(error.details[0].message, 422);
 
       // TODO: Rewrite this code to create multiple wallets
@@ -120,46 +120,27 @@ export class Controller {
           data: user.wallets[0],
         });
 
-      if (!user.embedlyCustomerId) {
-        const data = {
-          embedly: {
-            address: user?.address?.streetLine,
-            city: user?.address?.city,
-            country: user?.address?.country,
-            dob: user?.dob,
-            firstName: user?.name?.split(' ')[0],
-            lastName: user?.name?.split(' ')[1],
-            mobileNumber: user?.phone,
-            middleName: user?.name?.split(' ')[2],
-          },
-          email: user?.email!,
-          bvn: user?.bvn!,
-        };
+      const address = await prisma.address.findUnique({
+        where: { id: user.addressId },
+      });
 
-        const wallet = await createEmbedlyUser(user.id, data);
-
-        return res.status(200).json({
-          message: 'Wallet created successfully',
-          success: true,
-          data: wallet,
-        });
-      }
-
-      const verified = await Embedly.customers.verifyKYC({
+      const data = {
+        embedly: {
+          address: address?.streetLine,
+          city: address?.city,
+          country: address?.country,
+          dob: user?.dob,
+          firstName: user?.name?.split(' ')[0],
+          lastName: user?.name?.split(' ')[1],
+          phone: user?.phone,
+          middleName: user?.name?.split(' ')[2],
+        },
+        extra: { currency: value?.currency },
+        email: user?.email!,
         bvn: user?.bvn!,
-        customerId: user?.embedlyCustomerId,
-      });
+      };
 
-      if (!verified) throw new CustomError('User KYC not verified', 422);
-
-      const wallet = await WalletService.createWallet({
-        currency: value?.currency ?? 'NGN',
-        userId: user.id,
-      });
-
-      if (!wallet) throw new CustomError('Failed to create user wallet', 500);
-
-      await hashBVN(user.id, user?.bvn!);
+      const wallet = await createEmbedlyUser(user.id, data);
 
       return res.status(200).json({
         message: 'Wallet created successfully',

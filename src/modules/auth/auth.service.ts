@@ -146,6 +146,9 @@ export async function login(data: Login) {
     where: {
       OR: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
     },
+    include: {
+      wallets: true,
+    },
   });
 
   if (!user) throw new CustomError('Invalid credentials', 401);
