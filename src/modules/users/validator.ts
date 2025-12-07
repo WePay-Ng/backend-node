@@ -8,6 +8,18 @@ export function ValidatePin() {
   });
 }
 
+export function ValidateUniqueID() {
+  return Joi.object({
+    id: Joi.string().required(),
+  });
+}
+
+export function ValidatePhone() {
+  return Joi.object({
+    phone: Joi.string().pattern(/^[0-9]{10,15}$/),
+  });
+}
+
 export function ValidateSetCredential() {
   return Joi.object({
     phone: Joi.string()
@@ -90,5 +102,11 @@ export function ValidateVerification() {
         fileUrl: Joi.string().required(),
       }),
     ),
+  });
+}
+
+export function ValidateFingerPrint() {
+  return Joi.object({
+    fingerPrint: Joi.string().required(),
   });
 }

@@ -12,7 +12,6 @@ import { createEmbedlyUser, hashBVN } from '../users/service';
 import { Embedly } from '@/extensions/embedly';
 import axios from 'axios';
 import { banks } from '@/extensions/embedly/utils';
-import { tryCatch } from 'bullmq';
 import { environment } from '@/config/env';
 
 export class Controller {
@@ -109,6 +108,7 @@ export class Controller {
       if (!user) throw new CustomError('Unauthorized', 401);
 
       const { error, value } = ValidateCreateWallet().validate(req.body);
+      console.log(value);
       if (error) throw new CustomError(error.details[0].message, 422);
 
       // TODO: Rewrite this code to create multiple wallets
@@ -167,6 +167,7 @@ export class Controller {
         data: wallet,
       });
     } catch (error: any) {
+      console.log(error);
       const e = useErrorParser(error);
       return res.status(e.status).json(e);
     }
@@ -193,18 +194,50 @@ export class Controller {
 
   static async getBanks(req: Request, res: Response) {
     try {
-      const resp = await axios.get('https://api.nigerianbanklogos.xyz/');
-      const allBanks = resp.data;
+      const normalizeBankName = (name: string): string => {
+        return (
+          name
+            .toLowerCase()
+            .trim()
+            // Remove common suffixes
+            .replace(
+              /\s+(plc|ltd|limited|bank|holdings?|group|nig(eria)?|microfinance|mfb)$/gi,
+              '',
+            )
+            .replace(/\s+/g, ' ') // normalize whitespace
+            .trim()
+        );
+      };
 
-      const merged = banks
-        .map((bank: any) => {
-          const match = allBanks.find((b: any) =>
-            b.title.toLowerCase().includes(bank.bankName.toLowerCase()),
-          );
-          return match ? { ...bank, ...match } : null;
-        })
-        .filter(Boolean);
-      console.log(merged.length);
+      const resp = await axios.get('https://api.nigerianbanklogos.xyz/');
+
+      const allBanks = resp.data;
+      let i = 0;
+      const merged = banks.map((bank: any) => {
+        const normalizedBankName = normalizeBankName(bank.bankName);
+
+        const match = allBanks.find((b: any) => {
+          const normalizedApiTitle = normalizeBankName(b.title);
+
+          // Exact match after normalization
+          if (normalizedApiTitle === normalizedBankName) return true;
+
+          // Check if one contains the other (for cases like "Access" vs "Access Bank")
+          if (
+            normalizedApiTitle.includes(normalizedBankName) ||
+            normalizedBankName.includes(normalizedApiTitle)
+          ) {
+            return true;
+          }
+
+          return false;
+        });
+
+        // Keep all banks, add logo data if available
+        if (match) i++;
+        return match ? { ...bank, logo: match.route } : bank;
+      });
+      console.log(banks);
       return res.status(200).json({
         message: 'Retrieve all banks',
         success: true,
