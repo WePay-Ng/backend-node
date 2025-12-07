@@ -1,14 +1,12 @@
+/* eslint-disable prettier/prettier */
+
 // import jwt from "jsonwebtoken";
 import { prisma } from '@/prisma/client';
 import { verifyAccessToken } from '@/utils/jwt';
 import { NextFunction, Request, Response } from 'express';
 
 /** auth middleware */
-export default async function Auth(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
+export default async function Auth(req: Request, res: Response, next: NextFunction,) {
   try {
     // access authorize header to validate request
     const token = req?.headers?.authorization?.split(' ')[1];

@@ -12,6 +12,7 @@ model User {
   email                  String?              @unique
   password               String?              @db.VarChar(60)
   name                   String?
+  uniqueID               String?              @db.VarChar(8)
   embedlyCustomerId      String?              @db.Char(36)
   country                String?              @db.VarChar(100)
   bvn                    String?              @db.VarChar(64)
@@ -24,6 +25,7 @@ model User {
   religion               String?              @db.VarChar(30)
   maritalStatus          String?              @db.VarChar(20)
   pin                    String?
+  fingerPrint            String?
   status                 Status               @default(ACTIVE)
   isLocked               Boolean              @default(false)
   failedLoginAttempts    Int                  @default(0)

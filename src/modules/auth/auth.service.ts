@@ -1,11 +1,10 @@
 import { prisma } from '../../prisma/client';
-import { hashPassword, hashToken, verifyPin } from '../../utils/hash';
+import { hashPassword, hashPin, hashToken, verifyPin } from '../../utils/hash';
 import { nanoid } from 'nanoid';
 import { environment } from '../../config/env';
 import { signAccessToken } from '../../utils/jwt';
 import { addDays } from 'date-fns';
 import { Login, Register, ResetPassword } from '../../types/types';
-import { getUser } from '@/utils/getUser';
 import { User } from '@prisma/client';
 import Bottleneck from 'bottleneck';
 import { sendOTP } from '@/utils';
@@ -16,6 +15,59 @@ const limiter = new Bottleneck({
   minTime: 333,
 });
 
+// export async function register(data: Register) {
+//   if (data?.email) {
+//     const existing = await prisma.user.findFirst({
+//       where: { email: data.email },
+//     });
+//     if (existing) throw new Error('Email already in use');
+//   }
+//   // Prepare the user creation data
+//   const record: Record<string, unknown> = {
+//     ...data.extra,
+//   };
+
+//   if (data.role === 'AGENT')
+//     record.agent = {
+//       create: {},
+//     };
+
+//   if (data.role === 'MERCHANT')
+//     record.merchant = {
+//       create: {},
+//     };
+
+//   if (data.role === 'INSTITUTION')
+//     record.merchant = {
+//       create: {},
+//     };
+
+//   // hash bvn
+//   let bvnHash = hashToken(data.bvn);
+//   if (data.role === 'USER') bvnHash = data.bvn; //Hashing will come when user add emails
+//   if (data?.email !== undefined) record.email = data.email;
+
+//   const user = await prisma.$transaction(async (tx) => {
+//     const _user = await tx.user.create({
+//       data: {
+//         bvn: bvnHash,
+//         ...record,
+//       },
+//       include: { address: true },
+//     });
+
+//     await tx.auditLog.create({
+//       data: { userId: _user.id, action: 'REGISTER', ip: null },
+//     });
+
+//     return _user;
+//   });
+
+//   limiter.schedule(() => sendOTP(user));
+
+//   return user;
+// }
+
 export async function register(data: Register) {
   if (data?.email) {
     const existing = await prisma.user.findFirst({
@@ -23,35 +75,21 @@ export async function register(data: Register) {
     });
     if (existing) throw new Error('Email already in use');
   }
-  // Prepare the user creation data
+
   const record: Record<string, unknown> = {
     ...data.extra,
   };
 
-  if (data.role === 'AGENT')
-    record.agent = {
-      create: {},
-    };
+  if (data.role === 'AGENT') record.agent = { create: {} };
+  if (data.role === 'MERCHANT' || data.role === 'INSTITUTION')
+    record.merchant = { create: {} };
 
-  if (data.role === 'MERCHANT')
-    record.merchant = {
-      create: {},
-    };
-
-  if (data.role === 'INSTITUTION')
-    record.merchant = {
-      create: {},
-    };
-
-  // hash bvn
-  let bvnHash = hashToken(data.bvn);
-  if (data.role === 'USER') bvnHash = data.bvn; //Hashing will come when user add emails
   if (data?.email !== undefined) record.email = data.email;
 
   const user = await prisma.$transaction(async (tx) => {
     const _user = await tx.user.create({
       data: {
-        bvn: bvnHash,
+        bvn: data.bvn, //Hashing will come when user add emails,
         ...record,
       },
       include: { address: true },
@@ -91,57 +129,70 @@ export async function forgotPin(payload: {
   limiter.schedule(() => sendOTP(user));
 
   await prisma.auditLog.create({
-    data: { userId: user.id, action: 'FORGOT_PASSWORD_CODE' },
+    data: { userId: user.id, action: 'FORGOT_PIN_CODE' },
   });
   return true;
 }
 
 export async function login(data: Login) {
-  const user = await prisma.user.findUnique({ where: { phone: data.phone } });
-  if (!user) throw new Error('Invalid credentials');
-  // account lockout
+  const { email, phone, pin } = data;
 
-  if (!user.pin) throw new CustomError('User has no pin', 500);
-  const ok = await verifyPin(user.pin!, data.pin);
+  if (!pin) throw new CustomError('PIN is required', 422);
+  if (!email && !phone)
+    throw new CustomError('Email or phone is required', 422);
+
+  // Find user by email or phone
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
+    },
+  });
+
+  if (!user) throw new CustomError('Invalid credentials', 401);
+
+  if (!user.pin) throw new CustomError('User has no pin set', 400);
+
+  const ok = await verifyPin(user.pin, pin);
 
   if (!ok) {
-    // increment failed attempts if you have fields; for now just log and throw
+    // Optional: increment failed login attempts here
     await prisma.auditLog.create({
       data: { userId: user.id, action: 'FAILED_LOGIN' },
     });
-    throw new CustomError('Invalid credentials', 500);
+
+    throw new CustomError('Invalid credentials', 401);
   }
 
-  // success: issue tokens
-  const accessToken = signAccessToken({ sub: user.id, role: user.role });
-  const refreshRaw = nanoid(64);
-  const refreshHash = hashToken(refreshRaw);
-  const refreshExpires = addDays(
-    new Date(),
-    Number(environment.jwt.expiresIn.split(' ')[0]),
-  );
-
-  // persist refresh token server-side (requires RefreshToken model)
-  await prisma.refreshToken.create({
-    data: {
-      userId: user.id,
-      tokenHash: refreshHash,
-      expiresAt: refreshExpires,
-    },
-  });
-
+  // Successful login → Log it
   await prisma.auditLog.create({
-    data: {
-      userId: user.id,
-      action: 'LOGIN',
-    },
+    data: { userId: user.id, action: 'LOGIN' },
   });
 
-  return {
-    accessToken: accessToken,
-    refreshToken: refreshRaw,
-    user: await getUser(user),
-  };
+  return user;
+}
+
+export async function loginWithFinger(data: { fingerPrint: string }) {
+  const { fingerPrint } = data;
+
+  if (!fingerPrint) {
+    throw new CustomError('Finger is required or invalid finger data', 422);
+  }
+
+  // Find user directly by fingerprint
+  const user = await prisma.user.findFirst({
+    where: { fingerPrint: fingerPrint },
+  });
+
+  if (!user) {
+    throw new CustomError('Invalid fingerprint', 401);
+  }
+
+  // Log successful login
+  await prisma.auditLog.create({
+    data: { userId: user.id, action: 'LOGIN' },
+  });
+
+  return user;
 }
 
 export async function forgotPassword(data: { email: string; ip?: string }) {

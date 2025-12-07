@@ -105,6 +105,46 @@ export async function validateBVN(bvn: string) {
   return !!existing;
 }
 
+export async function getUserByPhone(phone: string) {
+  if (!phone) throw new CustomError('Phone Number is required', 422);
+
+  const user = await prisma.user.findFirst({
+    where: { phone: phone },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      name: true,
+      isLocked: true,
+      status: true,
+    },
+  });
+
+  if (!user) throw new CustomError('User not found', 404);
+
+  return user;
+}
+
+export async function getUserByID(ID: string) {
+  if (!ID) throw new CustomError('Wepay ID is required', 422);
+
+  const user = await prisma.user.findFirst({
+    where: { uniqueID: ID },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      name: true,
+      isLocked: true,
+      status: true,
+    },
+  });
+
+  if (!user) throw new CustomError('User not found', 404);
+
+  return user;
+}
+
 export async function addPassword(id: string, password: string) {
   if (password !== undefined)
     throw new CustomError('Password is required', 422);
@@ -167,7 +207,7 @@ export async function createPin(id: string, payload: { pin: string }) {
       },
       include: { address: true },
     });
-    console.log(user);
+
     if (user.embedlyCustomerId) return user;
 
     await tx.outboxEvent.create({
@@ -267,4 +307,22 @@ export async function getBVNData(value: BVNInput) {
       middleName: data?.middleName,
     },
   };
+}
+
+export async function captureFingerPrint(
+  id: string,
+  payload: { fingerPrint: string },
+) {
+  // Optionally, hash the fingerprint before saving for security
+  // const hashedFingerPrint = await hashPin(payload.fingerPrint);
+
+  const user = await prisma.user.update({
+    where: { id },
+    data: {
+      fingerPrint: payload.fingerPrint,
+    },
+    include: { address: true },
+  });
+
+  return user;
 }
