@@ -4,7 +4,7 @@ import { idempotency } from '@/middleware/idempotency';
 
 const router = Router();
 
-router.post('/create', Controller.createWallet);
+router.post('/', Controller.createWallet);
 router.get('/banks', Controller.getBanks);
 router.get('/:account', Controller.getWalletFromAccount);
 router.post('/transfer', idempotency, Controller.transfer);
