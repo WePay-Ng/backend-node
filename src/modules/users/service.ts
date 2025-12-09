@@ -20,6 +20,7 @@ export async function update(
   data: {
     nextOfKin?: NextOfKin;
     bank?: Bank;
+    bvn?: string;
     address?: Address;
     emailVerified?: boolean;
     occupation?: string;
@@ -45,6 +46,7 @@ export async function update(
     if (data.occupation !== undefined) record.occupation = data.occupation;
     if (data.education !== undefined) record.education = data.education;
     if (data.religion !== undefined) record.religion = data.religion;
+    if (data.bvn !== undefined) record.bvn = data.bvn;
     if (data.embedlyCustomerId !== undefined)
       record.embedlyCustomerId = data.embedlyCustomerId;
     if (data.maritalStatus !== undefined)
@@ -161,21 +163,6 @@ export async function addPassword(id: string, password: string) {
   return await getUser(user);
 }
 
-export async function hashBVN(id: string, bvn: string) {
-  if (bvn === undefined) throw new CustomError('Bvn is required', 422);
-
-  const bvnHash = hashToken(bvn);
-
-  const user = await prisma.user.update({
-    where: { id },
-    data: {
-      bvn: bvnHash,
-    },
-  });
-
-  return user;
-}
-
 export async function addVerification(id: string, data: any) {
   if (!data.documents.length)
     throw new CustomError('Atleast one ocument required', 422);
@@ -207,7 +194,7 @@ export async function createPin(id: string, payload: { pin: string }) {
     include: { address: true },
   });
 
-  if (user.embedlyCustomerId && !user?.address?.streetLine) return user;
+  if (user.embedlyCustomerId) return user;
 
   // Trigger wallet creation
   await prisma.outboxEvent.create({
@@ -240,43 +227,97 @@ export async function verifyUserPin(
 }
 
 export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
-  console.log(data, 'createEmbedlyUser');
-  const embedly = await Embedly.customers.personal({
-    address: data?.embedly?.address,
-    city: data?.embedly?.city,
-    country: data?.embedly?.country,
-    dob: data?.embedly?.dob,
-    firstName: data?.embedly?.firstName,
-    lastName: data?.embedly?.lastName,
-    mobileNumber: data?.embedly?.phone,
-    middleName: data?.embedly?.middleName ?? data?.embedly?.lastName,
-    emailAddress: data.email,
-  });
+  let embedly = { id: data?.embedly?.id };
 
-  console.log(embedly, 'after created Customer');
-  if (!embedly) return;
+  if (!embedly.id) {
+    embedly = await Embedly.customers.personal({
+      address: data?.embedly?.address,
+      city: data?.embedly?.city,
+      country: data?.embedly?.country,
+      dob: data?.embedly?.dob,
+      firstName: data?.embedly?.firstName,
+      lastName: data?.embedly?.lastName,
+      mobileNumber: data?.embedly?.phone,
+      middleName: data?.embedly?.middleName ?? data?.embedly?.lastName,
+      emailAddress: data.email,
+    });
 
-  await update(userId, {
-    embedlyCustomerId: embedly?.id,
-  });
+    if (!embedly.id) {
+      await prisma.outboxEvent.create({
+        data: {
+          aggregateId: userId,
+          topic: 'embedly.user.wallet.creation.customer.failed',
+          payload: {
+            userId: userId,
+            data,
+            customerId: embedly.id,
+            error: 'Embedly personal account could be created',
+            embedly,
+          },
+        },
+      });
 
-  console.log(embedly, 'created Customer');
+      throw new CustomError('Embedly personal account could be created', 500);
+    }
+
+    await update(userId, {
+      embedlyCustomerId: embedly.id,
+    });
+  }
+
   const verified = await Embedly.customers.verifyKYC({
     bvn: data.bvn,
-    customerId: embedly?.id,
+    customerId: embedly.id,
   });
 
-  if (!verified) return;
+  if (!verified) {
+    await prisma.outboxEvent.create({
+      data: {
+        aggregateId: userId,
+        topic: 'embedly.user.wallet.creation.kyc.failed',
+        payload: {
+          userId: userId,
+          bvn: data.bvn,
+          customerId: embedly.id,
+          error: 'Embedly KYC could not be verified',
+          verified,
+        },
+      },
+    });
+
+    throw new CustomError('Embedly KYC could not be verified', 500);
+  }
 
   const wallet = await createWallet({
     userId: userId,
+    customerId: embedly.id,
     currency: data?.extra?.currency ?? 'NGN',
   });
+
   console.log(wallet, 'created wallet');
-  if (!wallet) return;
+  if (!wallet) {
+    await prisma.outboxEvent.create({
+      data: {
+        aggregateId: userId,
+        topic: 'embedly.user.wallet.creation.wallet.failed',
+        payload: {
+          userId: userId,
+          wallet,
+          customerId: embedly.id,
+          error: 'Wallet could not be created',
+        },
+      },
+    });
+    throw new CustomError('Wallet could not be created', 500);
+  }
 
   console.log(wallet, 'after before hashed wallet');
-  await hashBVN(userId, data?.bvn!);
+
+  const bvnHash = hashToken(data?.bvn);
+  await update(userId, {
+    bvn: bvnHash,
+  });
+
   return wallet;
 }
 

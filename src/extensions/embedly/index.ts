@@ -79,6 +79,16 @@ class Customer {
     }
   }
 
+  static async get(id: string) {
+    const res = await Client.get('/customers/get/id/' + id);
+    const { data: result } = res;
+
+    if (result?.code !== '00')
+      throw new CustomError('Failed to retrieve Customer from Embedly', 404);
+
+    return result.data;
+  }
+
   static async corporate(payload: Corporate) {
     try {
       const customerTypeId = findItem(types, payload.type, 'name')?.id;
@@ -147,7 +157,7 @@ class Wallet {
   static async create(wallet: iWallet) {
     const currency = currencies.find((c) => c.shortName === wallet.currency);
 
-    const { currency: c, ...rest } = wallet;
+    const { currency: c, userId, ...rest } = wallet;
     const res = await Client.post('/wallets/add', {
       ...rest,
       currencyId: currency?.id,

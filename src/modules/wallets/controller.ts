@@ -8,7 +8,7 @@ import {
 import * as WalletService from './service';
 import { useErrorParser } from '@/utils';
 import { prisma } from '@/prisma/client';
-import { createEmbedlyUser, hashBVN } from '../users/service';
+import * as UserService from '../users/service';
 import { Embedly } from '@/extensions/embedly';
 import axios from 'axios';
 import { banks } from '@/extensions/embedly/utils';
@@ -134,13 +134,14 @@ export class Controller {
           lastName: user?.name?.split(' ')[1],
           phone: user?.phone,
           middleName: user?.name?.split(' ')[2],
+          id: user?.embedlyCustomerId,
         },
         extra: { currency: value?.currency },
         email: user?.email!,
         bvn: user?.bvn!,
       };
 
-      const wallet = await createEmbedlyUser(user.id, data);
+      const wallet = await UserService.createEmbedlyUser(user.id, data);
 
       return res.status(200).json({
         message: 'Wallet created successfully',
