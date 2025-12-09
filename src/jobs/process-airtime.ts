@@ -1,6 +1,7 @@
 import { prisma } from '@/prisma/client';
 import { Akuuk } from '@/extensions/akuuk';
 import { Queue } from './queues';
+import { amountInKobo, formatTransferSMS } from '@/utils';
 
 export async function processAirtimeEvent(eventId: any) {
   const event = await prisma.outboxEvent.findFirst({
@@ -17,6 +18,8 @@ export async function processAirtimeEvent(eventId: any) {
     userId?: string;
     fromWalletId?: string;
     country?: string;
+    balance: number;
+    accountNumber: number;
   };
 
   let response: any = null;
@@ -97,9 +100,20 @@ export async function processAirtimeEvent(eventId: any) {
     });
 
     if (!user) return response;
+
+    const message = formatTransferSMS({
+      account: payload.accountNumber + '',
+      amount: amountInKobo(Number(payload.amount)),
+      desc: 'Airtime Purchase to ' + payload.phoneNumber,
+      balance: amountInKobo(Number(payload.balance)),
+      date: new Date(),
+      currency: response?.details?.currency ?? 'NGN',
+      type: 'DR',
+    });
+
     await Queue.trigger(eventId, 'NOTIFICATION', {
       country: user?.country ?? 'NG',
-      message: `Airtime purchase successful`,
+      message,
       phone: user?.phone!,
       type: 'SMS',
     });
@@ -154,12 +168,15 @@ export async function processAirtimeEvent(eventId: any) {
       });
 
       const newUserLedgerBalance =
-        Number(wallet?.ledgerBalance) + Number(payload?.amount);
+        BigInt(wallet?.ledgerBalance!) + amountInKobo(Number(payload.amount));
+      const newAvailableBalance =
+        BigInt(wallet?.availableBalance!) +
+        amountInKobo(Number(payload.amount));
 
       await tx.wallet.update({
         where: { id: payload.fromWalletId },
         data: {
-          availableBalance: newUserLedgerBalance,
+          availableBalance: newAvailableBalance,
           ledgerBalance: newUserLedgerBalance,
         },
       });
@@ -175,6 +192,28 @@ export async function processAirtimeEvent(eventId: any) {
           },
         },
       });
+
+      const message = formatTransferSMS({
+        account: payload.accountNumber + '',
+        amount: amountInKobo(Number(payload.amount)),
+        desc: 'Reversed: Airtime Purchase to ' + payload.phoneNumber,
+        balance: newAvailableBalance,
+        date: new Date(),
+        currency: response?.details?.currency ?? 'NGN',
+        type: 'CR',
+      });
+
+      const user = await prisma.user.findFirst({
+        where: { id: payload.userId },
+      });
+      if (user) {
+        await Queue.trigger(eventId, 'NOTIFICATION', {
+          country: user?.country ?? 'NG',
+          message,
+          phone: user?.phone!,
+          type: 'SMS',
+        });
+      }
     });
 
     await prisma.outboxEvent.create({
