@@ -33,10 +33,14 @@ jobs:
                 cd /${{ secrets.VM_USER }}/wepay-app
             fi
 
+            echo "Cleaning up old Docker images and containers..."
+            docker system prune -af || true
+
             # Run docker only if compose file exists
             if [ -f docker-compose.yml ]; then
               docker compose down || true
-              docker compose up -d --build
+              docker compose build --no-cache
+              docker compose up -d --force-recreate
             else
               echo '⚠️ No docker-compose.yml found!'
             fi
