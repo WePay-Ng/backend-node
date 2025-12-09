@@ -240,6 +240,7 @@ export async function verifyUserPin(
 }
 
 export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
+  console.log(data, 'createEmbedlyUser');
   const embedly = await Embedly.customers.personal({
     address: data?.embedly?.address,
     city: data?.embedly?.city,
@@ -252,12 +253,14 @@ export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
     emailAddress: data.email,
   });
 
+  console.log(embedly, 'after created Customer');
   if (!embedly) return;
 
   await update(userId, {
     embedlyCustomerId: embedly?.id,
   });
 
+  console.log(embedly, 'created Customer');
   const verified = await Embedly.customers.verifyKYC({
     bvn: data.bvn,
     customerId: embedly?.id,
@@ -269,9 +272,10 @@ export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
     userId: userId,
     currency: data?.extra?.currency ?? 'NGN',
   });
-
+  console.log(wallet, 'created wallet');
   if (!wallet) return;
 
+  console.log(wallet, 'after before hashed wallet');
   await hashBVN(userId, data?.bvn!);
   return wallet;
 }

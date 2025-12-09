@@ -56,6 +56,9 @@ class Customer {
         countryId: country?.id,
         address: sanitizedAddress,
       };
+
+      console.log(data, 'Embedly API Call');
+
       const res = await Client.post('/customers/add', data);
       const { data: result } = res;
 
@@ -63,6 +66,7 @@ class Customer {
 
       return result.data;
     } catch (error) {
+      console.log(error, 'Error Embedly API Call');
       const res = error?.response?.data;
       if (res && !res.success)
         throw new CustomError(
