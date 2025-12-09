@@ -243,12 +243,34 @@ export async function logout(refreshTokenRaw?: string, ip?: string) {
   // audit log optional
 }
 
-export async function resendOTP(userId: string) {
+export async function resendOTP(userId: string, data: any) {
   const user = await prisma.user.findFirst({
     where: { id: userId },
   });
 
   if (!user) throw new CustomError('User not found', 500);
+
+  if (data.email && data.type === 'EMAIL') {
+    const _user = await prisma.user.findFirst({
+      where: {
+        email: data.email,
+      },
+    });
+
+    if (_user) throw new CustomError('User exist. Click on forgot pin', 409);
+
+    limiter.schedule(() =>
+      sendOTP(
+        {
+          ...user,
+          email: data.email,
+          name: data?.name ?? '',
+        },
+        data.type,
+      ),
+    );
+    return;
+  }
 
   limiter.schedule(() => sendOTP(user));
 

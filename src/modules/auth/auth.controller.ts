@@ -7,9 +7,11 @@ import {
   ValidateForgotPin,
   ValidateLogin,
   ValidateLoginWithFinger,
+  ValidateOTP,
   ValidateRegister,
   ValidateResetPassword,
   ValidateResetPin,
+  ValidateVerifyDOB,
   VerifyBVN,
 } from './validator';
 import CustomError from '@/utils/customError';
@@ -173,6 +175,34 @@ export class AuthController {
     }
   }
 
+  static async verifyDOB(req: Request, res: Response) {
+    try {
+      const { error, value } = ValidateVerifyDOB().validate(req.body);
+      if (error) throw new Error(error.details[0].message);
+
+      const data = await userService.getBVNData({
+        ...value,
+        role: 'USER',
+      });
+
+      if (!data) throw new CustomError("Couldn't verify BVN", 500);
+
+      const dob = data?.extra?.dob;
+      const isVerified = dob === value.dob;
+
+      return res.status(200).json({
+        message: 'Birthday verified successfully',
+        success: true,
+        data: {
+          isVerified,
+        },
+      });
+    } catch (error) {
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
+    }
+  }
+
   static async resetPin(req: Request, res: Response) {
     try {
       const user = req?.user;
@@ -302,10 +332,13 @@ export class AuthController {
     }
   }
 
-  static async resendOTP(req: Request, res: Response) {
+  static async sendOTP(req: Request, res: Response) {
     try {
+      const { error, value } = ValidateOTP().validate(req.body);
+      if (error) throw new Error(error.details[0].message);
+
       const id = req.params.id;
-      await authService.resendOTP(id);
+      await authService.resendOTP(id, value);
 
       return res.status(200).json({
         message: 'OTP Sent Successful',

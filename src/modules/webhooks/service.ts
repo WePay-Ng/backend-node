@@ -22,13 +22,10 @@ export async function payout(payload: any) {
 
     const transferRecord = await prisma.$transaction(async (tx) => {
       // TODO: Check if you can use decrement in updateWallet instead of quering here
-      console.log(transfer.fromWalletId!, 'FromWalletID');
       const wallet = await tx.wallet.findFirst({
         where: { id: transfer.fromWalletId! },
         include: { user: true },
       });
-
-      console.log(wallet, 'WEBHOOK');
 
       const updatedTransfer = await tx.transfer.update({
         where: { id: transfer?.id },
@@ -61,7 +58,7 @@ export async function payout(payload: any) {
 
       const message = formatTransferSMS({
         account: updatedWallet.accountNumber,
-        amount: payload.amount,
+        amount: newAmountInKobo,
         type: 'DR',
         desc: `TRANSFER TO ${payload?.creditAccountName} - ${payload?.description}`.toUpperCase(),
         currency: transfer.currency,
@@ -207,7 +204,7 @@ export async function payout(payload: any) {
       // Notify user of reversal
       const message = formatTransferSMS({
         account: trx.wallet.accountNumber,
-        amount: payload.amount,
+        amount: newAmountInKobo,
         type: 'CR',
         desc: `REVERSED: ${payload?.creditAccountName} - ${payload?.description}`.toUpperCase(),
         currency: trx.transfer?.currency!,
@@ -365,7 +362,7 @@ export async function inflow(payload: any) {
 
   const message = formatTransferSMS({
     account: wallet.accountNumber,
-    amount: payload.amount,
+    amount: amountInKobo(Number(payload.amount)),
     type: 'CR',
     desc: `TRANSFER FROM ${payload?.senderName} - ${payload?.description}`.toUpperCase(),
     currency: transfer.currency,
