@@ -52,7 +52,7 @@ export const QUEUE_NAMES = {
   CREATEWALLET: 'create_wallet',
 } as const;
 
-export async function sendOTP(user: User) {
+export async function sendOTP(user: User, type = 'PHONE') {
   const code = otpGenerator.generate(6, {
     lowerCaseAlphabets: false,
     upperCaseAlphabets: false,
@@ -63,21 +63,21 @@ export async function sendOTP(user: User) {
     data: {
       refreshCode: code,
       userId: user.id,
-      type: user.phone && !user?.email ? 'PHONE' : 'EMAIL',
+      type: type === 'PHONE' ? 'PHONE' : 'EMAIL',
     },
   });
 
   if (!verification) throw new Error('OTP not saved');
 
   // Send SMS
-  if (user.phone)
+  if (user.phone && type === 'PHONE')
     Akuuk.sendSMS({
       country: user?.country ?? 'NG',
       number: user.phone,
       message: `Your WePay verification code is: ${code}`,
     }).catch((e) => console.log(e));
 
-  if (user.email)
+  if (user.email && type === 'EMAIL')
     sendEmail({
       to: user?.email!,
       variables: {
