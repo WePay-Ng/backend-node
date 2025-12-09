@@ -270,8 +270,6 @@ export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
     customerId: embedly.id,
   });
 
-  console.log(verified);
-
   if (!verified) {
     await prisma.outboxEvent.create({
       data: {
@@ -320,8 +318,6 @@ export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
     bankCode: result.virtualAccount?.bankCode,
     id: result?.id,
   });
-
-  console.log(wallet, 'created wallet');
 
   const bvnHash = hashToken(data?.bvn);
   await update(userId, {
