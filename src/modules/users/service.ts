@@ -270,6 +270,8 @@ export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
     customerId: embedly.id,
   });
 
+  console.log(verified);
+
   if (!verified) {
     await prisma.outboxEvent.create({
       data: {
@@ -292,7 +294,9 @@ export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
     userId: userId,
     customerId: embedly.id,
     currency: data?.extra?.currency ?? 'NGN',
+    name: `WePay-${userId}`,
   });
+
   if (!result) {
     await prisma.outboxEvent.create({
       data: {

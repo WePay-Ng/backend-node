@@ -503,6 +503,7 @@ export async function create(payload: {
       availableBalance: 0,
       ledgerBalance: 0,
       userId: payload.userId,
+      status: 'ACTIVE',
     },
   });
 

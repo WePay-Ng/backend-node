@@ -132,6 +132,14 @@ class Customer {
       return result.data;
     } catch (error) {
       const res = error?.response?.data;
+      const message = 'Customer has already completed BVN verification!';
+
+      if (res && res.message.includes(message)) {
+        return {
+          success: true,
+        };
+      }
+
       if (res && !res.success)
         throw new CustomError(res.message, res.statusCode);
 
