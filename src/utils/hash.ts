@@ -14,6 +14,7 @@ export async function verifyPassword(hash: string, plain: string) {
 }
 
 export function hashToken(token: string) {
+  if (!token) return;
   if (isTestingBVN(token)) {
     return crypto
       .createHash('sha256')
