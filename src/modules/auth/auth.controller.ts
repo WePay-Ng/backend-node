@@ -36,17 +36,6 @@ export class AuthController {
 
       const user = await authService.register(payload as any);
 
-      // Wallet should only be created when the update with proper address
-      // if (value?.email) {
-      //   // limiter.schedule(
-      //   //   () =>
-      //   await userService.createEmbedlyUser(user.id, {
-      //     ...payload,
-      //     email: value.email,
-      //   });
-      //   // );
-      // }
-
       return res.status(201).json({
         message: 'User created successfully',
         status: 201,
@@ -183,27 +172,6 @@ export class AuthController {
       return res.status(e.status).json(e);
     }
   }
-
-  // static async resetPin(req: Request, res: Response) {
-  //   try {
-  //     const user = req?.user;
-  //     if (!user) throw new CustomError('unauthorized', 402);
-
-  //     const { error, value } = ValidateResetPin().validate(req.body);
-  //     if (error) throw new Error(error.details[0].message);
-
-  //     const data = await authService.resetPin(user, value);
-
-  //     return res.status(200).json({
-  //       message: 'Pin reset successfully',
-  //       success: true,
-  //       data: data,
-  //     });
-  //   } catch (error: any) {
-  //     const e = useErrorParser(error);
-  //     return res.status(e.status).json(e);
-  //   }
-  // }
 
   static async resetPin(req: Request, res: Response) {
     try {

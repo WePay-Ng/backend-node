@@ -29,7 +29,7 @@ jobs:
                 git reset --hard origin/main
             else
                 rm -rf /${{ secrets.VM_USER }}/wepay-app
-                git clone git@github.com:Kaperskyguru/wepay.git /${{ secrets.VM_USER }}/wepay-app
+                git clone git@github.com:WePay-Ng/backend-node.git /${{ secrets.VM_USER }}/wepay-app
                 cd /${{ secrets.VM_USER }}/wepay-app
             fi
 

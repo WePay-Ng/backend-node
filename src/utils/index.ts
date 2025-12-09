@@ -225,6 +225,12 @@ function wrapText(text?: string, max = 32) {
   return lines.join('\n');
 }
 
+function shortenDesc(desc?: string, max = 30) {
+  if (!desc) return desc;
+  if (desc.length <= max) return desc;
+  return desc.slice(0, max - 3) + '...';
+}
+
 export function formatTransferSMS({
   account,
   amount,
@@ -245,7 +251,8 @@ export function formatTransferSMS({
   return `
 Acct: ******${account.slice(-4)}
 Amt: ${currency}${formatCurrency(amountInNaira(amount))} ${type}
-Desc: ${wrapText(desc)}
+Desc: ${wrapText(shortenDesc(desc))}
 Avail Bal: ${currency}${formatCurrency(amountInNaira(balance))}
-Date: ${formatDate(date)}`;
+Date: ${formatDate(date)}
+Thanks for using WePay`;
 }
