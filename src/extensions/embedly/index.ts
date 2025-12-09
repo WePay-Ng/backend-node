@@ -62,7 +62,7 @@ class Customer {
       const res = await Client.post('/customers/add', data);
       const { data: result } = res;
 
-      if (result.code !== '00') throw new CustomError(result.message, 500);
+      if (result.code !== '00') return;
 
       return result.data;
     } catch (error) {
@@ -128,7 +128,7 @@ class Customer {
       });
       const { data: result } = res;
 
-      if (result.code !== '00') throw new CustomError(result.message, 500);
+      if (result.code !== '00') return;
       return result.data;
     } catch (error) {
       const res = error?.response?.data;
@@ -164,8 +164,7 @@ class Wallet {
     });
     const { data: result } = res;
 
-    if (result?.code !== '00')
-      throw new CustomError('Wallet creation failed', 500);
+    if (result?.code !== '00') return;
 
     return result.data;
   }
@@ -174,8 +173,7 @@ class Wallet {
     const res = await Client.get('/wallets/get/wallet/' + id);
     const { data: result } = res;
 
-    if (result?.code !== '00')
-      throw new CustomError('Failed to retrieve Wallet from Embedly', 404);
+    if (result?.code !== '00') return;
 
     return result.data;
   }

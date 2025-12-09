@@ -486,17 +486,20 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
   return transfer;
 }
 
-export async function createWallet(payload: iWallet) {
-  const result = await Embedly.wallets.create(payload);
-  if (!result) throw new CustomError('Wallet not creted on embedly', 500);
-
+export async function create(payload: {
+  accountNumber: string;
+  bankCode: string;
+  bankName: string;
+  id: string;
+  userId: string;
+}) {
   // Create user wallet
   const userWallet = await prisma.wallet.create({
     data: {
-      accountNumber: result.virtualAccount.accountNumber,
-      bankCode: result.virtualAccount.bankCode,
-      bankName: result.virtualAccount.bankName,
-      walletId: result?.id,
+      accountNumber: payload.accountNumber,
+      bankCode: payload.bankCode,
+      bankName: payload.bankName,
+      walletId: payload?.id,
       availableBalance: 0,
       ledgerBalance: 0,
       userId: payload.userId,

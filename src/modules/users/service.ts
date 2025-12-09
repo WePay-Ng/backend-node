@@ -13,7 +13,7 @@ import { Embedly } from '@/extensions/embedly';
 import { Youverify } from '@/extensions/you-verify';
 import { toISODate } from '@/utils';
 import { Queue } from '@/jobs/queues';
-import { createWallet } from '../wallets/service';
+import * as WalletService from '../wallets/service';
 
 export async function update(
   id: string,
@@ -288,21 +288,19 @@ export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
     throw new CustomError('Embedly KYC could not be verified', 500);
   }
 
-  const wallet = await createWallet({
+  const result = await Embedly.wallets.create({
     userId: userId,
     customerId: embedly.id,
     currency: data?.extra?.currency ?? 'NGN',
   });
-
-  console.log(wallet, 'created wallet');
-  if (!wallet) {
+  if (!result) {
     await prisma.outboxEvent.create({
       data: {
         aggregateId: userId,
         topic: 'embedly.user.wallet.creation.wallet.failed',
         payload: {
           userId: userId,
-          wallet,
+          wallet: result,
           customerId: embedly.id,
           error: 'Wallet could not be created',
         },
@@ -311,7 +309,15 @@ export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
     throw new CustomError('Wallet could not be created', 500);
   }
 
-  console.log(wallet, 'after before hashed wallet');
+  const wallet = await WalletService.create({
+    userId: userId,
+    accountNumber: result.virtualAccount?.accountNumber,
+    bankName: result.virtualAccount?.bankName,
+    bankCode: result.virtualAccount?.bankCode,
+    id: result?.id,
+  });
+
+  console.log(wallet, 'created wallet');
 
   const bvnHash = hashToken(data?.bvn);
   await update(userId, {
