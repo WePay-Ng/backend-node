@@ -171,7 +171,10 @@ export class Controller {
         success: true,
         data: wallet,
       });
-    } catch (error) {}
+    } catch (error) {
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
+    }
   }
 
   static async getBanks(req: Request, res: Response) {
