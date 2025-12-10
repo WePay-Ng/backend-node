@@ -19,7 +19,7 @@ pnpm-debug.log*
 example.txt
 
 # Build output
-dist/
+# dist/
 build/
 out/
 
