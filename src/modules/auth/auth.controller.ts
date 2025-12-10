@@ -33,7 +33,7 @@ export class AuthController {
       if (error) throw new CustomError(error.details[0].message, 422);
 
       const exist = await userService.validateBVN(value.bvn);
-      if (exist) throw new Error('BVN already in use');
+      if (exist) throw new CustomError('BVN already in use', 403);
 
       const payload = await userService.getBVNData(value);
 

@@ -74,7 +74,7 @@ export async function sendOTP(user: User, type = 'PHONE') {
     Akuuk.sendSMS({
       country: user?.country ?? 'NG',
       number: user.phone,
-      message: `Your WePay verification code is: ${code}`,
+      message: `Your WePay verification code is: ${code}. Thanks you for choosing WePay`,
     }).catch((e) => console.log(e));
 
   if (user.email && type === 'EMAIL')
