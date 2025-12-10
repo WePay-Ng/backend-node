@@ -11,6 +11,7 @@ import {
   ValidateRegister,
   ValidateResetPassword,
   ValidateResetPin,
+  ValidateUpdatePin,
   ValidateVerifyDOB,
   VerifyBVN,
 } from './validator';
