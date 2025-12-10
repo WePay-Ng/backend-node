@@ -7,10 +7,15 @@ import {
   ValidateForgotPin,
   ValidateLogin,
   ValidateLoginWithFinger,
+  ValidateOTP,
   ValidateRegister,
   ValidateResetPassword,
   ValidateResetPin,
+<<<<<<< HEAD
   ValidateUpdatePin,
+=======
+  ValidateVerifyDOB,
+>>>>>>> 96cc4de9b79379261c7ba4daf927edc9723371a8
   VerifyBVN,
 } from './validator';
 import CustomError from '@/utils/customError';
@@ -36,17 +41,6 @@ export class AuthController {
       const payload = await userService.getBVNData(value);
 
       const user = await authService.register(payload as any);
-
-      // Wallet should only be created when the update with proper address
-      // if (value?.email) {
-      //   // limiter.schedule(
-      //   //   () =>
-      //   await userService.createEmbedlyUser(user.id, {
-      //     ...payload,
-      //     email: value.email,
-      //   });
-      //   // );
-      // }
 
       return res.status(201).json({
         message: 'User created successfully',
@@ -185,26 +179,33 @@ export class AuthController {
     }
   }
 
-  // static async resetPin(req: Request, res: Response) {
-  //   try {
-  //     const user = req?.user;
-  //     if (!user) throw new CustomError('unauthorized', 402);
+  static async verifyDOB(req: Request, res: Response) {
+    try {
+      const { error, value } = ValidateVerifyDOB().validate(req.body);
+      if (error) throw new Error(error.details[0].message);
 
-  //     const { error, value } = ValidateResetPin().validate(req.body);
-  //     if (error) throw new Error(error.details[0].message);
+      const data = await userService.getBVNData({
+        ...value,
+        role: 'USER',
+      });
 
-  //     const data = await authService.resetPin(user, value);
+      if (!data) throw new CustomError("Couldn't verify BVN", 500);
 
-  //     return res.status(200).json({
-  //       message: 'Pin reset successfully',
-  //       success: true,
-  //       data: data,
-  //     });
-  //   } catch (error: any) {
-  //     const e = useErrorParser(error);
-  //     return res.status(e.status).json(e);
-  //   }
-  // }
+      const dob = data?.extra?.dob;
+      const isVerified = dob === value.dob;
+
+      return res.status(200).json({
+        message: 'Birthday verified successfully',
+        success: true,
+        data: {
+          isVerified,
+        },
+      });
+    } catch (error) {
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
+    }
+  }
 
   static async resetPin(req: Request, res: Response) {
     try {
@@ -364,10 +365,13 @@ export class AuthController {
     }
   }
 
-  static async resendOTP(req: Request, res: Response) {
+  static async sendOTP(req: Request, res: Response) {
     try {
+      const { error, value } = ValidateOTP().validate(req.body);
+      if (error) throw new Error(error.details[0].message);
+
       const id = req.params.id;
-      await authService.resendOTP(id);
+      await authService.resendOTP(id, value);
 
       return res.status(200).json({
         message: 'OTP Sent Successful',

@@ -93,6 +93,7 @@ export async function airtime(
 
     // compute new balances
     const newUserLedgerBalance = BigInt(lockedMap.ledgerBalance) - amt;
+    const newAvailableBalance = BigInt(available) - amt;
 
     // create ledger rows (debit then credit), reference journal.id
     const debit = await tx.ledger.create({
@@ -113,11 +114,11 @@ export async function airtime(
     });
 
     // update wallets balances
-    await tx.wallet.update({
+    const wallet = await tx.wallet.update({
       where: { id: fromWallet.id },
       data: {
         ledgerBalance: newUserLedgerBalance,
-        availableBalance: newUserLedgerBalance,
+        availableBalance: newAvailableBalance,
         version: { increment: 1 },
       },
     });
@@ -167,6 +168,8 @@ export async function airtime(
           amount: amountInNaira(amt),
           currency: 'NGN',
           country: payload.country,
+          accountNumber: wallet.accountNumber,
+          balance: amountInNaira(newAvailableBalance),
         },
       },
     });

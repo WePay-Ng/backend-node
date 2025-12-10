@@ -8,17 +8,19 @@ export async function processEmbedlyWallet(eventId: any) {
     where: { aggregateId: eventId },
   });
 
+  console.log(event, 'GET EVENT');
+
   if (!event) return;
 
   const payload = event?.payload as {
     userId: string;
     streetLine: string;
-    city?: string;
-    country?: string;
-    dob?: string;
-    name?: string;
-    phone?: string;
-    email?: string;
+    city: string;
+    country: string;
+    dob: string;
+    name: string;
+    phone: string;
+    email: string;
     bvn: string;
   };
   try {
@@ -35,28 +37,33 @@ export async function processEmbedlyWallet(eventId: any) {
       middleName: payload?.name?.split(' ')?.[2] ?? '',
     };
 
+    console.log(data, 'GET PAYLOAD');
+
     const wallet = await createEmbedlyUser(eventId, {
       embedly: data,
       email: payload.email,
       bvn: payload?.bvn?.trim()!,
     });
 
-    console.log(wallet);
+    console.log(wallet, 'CREATE EMBEDLY WALLET');
 
     await prisma.outboxEvent.create({
       data: {
         aggregateId: eventId,
-        topic: 'embedly.user.wallet.creation.failed',
+        topic: 'embedly.user.wallet.creation.completed',
         payload: {
           userId: eventId,
           name: payload.name,
           email: payload.email,
+          walletId: wallet?.id,
         },
       },
     });
 
     return wallet;
   } catch (error) {
+    console.log(error, 'ProcessEmbedlyUSer');
+
     await prisma.outboxEvent.create({
       data: {
         aggregateId: eventId,

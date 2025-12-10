@@ -13,6 +13,22 @@ export function ValidateRegister() {
   });
 }
 
+export function ValidateVerifyDOB() {
+  return Joi.object({
+    dob: Joi.string()
+      .pattern(/^\d{4}-\d{2}-\d{2}$/)
+      .required(),
+    bvn: Joi.string().min(11).max(11).required(),
+  });
+}
+
+export function ValidateOTP() {
+  return Joi.object({
+    email: Joi.string().email().optional(),
+    type: Joi.string().valid('PHONE', 'EMAIL').default('EMAIL'),
+  });
+}
+
 export function ValidateForgotPin() {
   return Joi.object({
     phone: Joi.string().optional(),

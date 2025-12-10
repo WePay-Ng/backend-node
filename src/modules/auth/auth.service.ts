@@ -1,5 +1,5 @@
 import { prisma } from '../../prisma/client';
-import { hashPassword, hashPin, hashToken, verifyPin } from '../../utils/hash';
+import { hashPassword, hashToken, verifyPin } from '../../utils/hash';
 import { nanoid } from 'nanoid';
 import { environment } from '../../config/env';
 import { signAccessToken } from '../../utils/jwt';
@@ -15,59 +15,6 @@ const limiter = new Bottleneck({
   maxConcurrent: 1,
   minTime: 333,
 });
-
-// export async function register(data: Register) {
-//   if (data?.email) {
-//     const existing = await prisma.user.findFirst({
-//       where: { email: data.email },
-//     });
-//     if (existing) throw new Error('Email already in use');
-//   }
-//   // Prepare the user creation data
-//   const record: Record<string, unknown> = {
-//     ...data.extra,
-//   };
-
-//   if (data.role === 'AGENT')
-//     record.agent = {
-//       create: {},
-//     };
-
-//   if (data.role === 'MERCHANT')
-//     record.merchant = {
-//       create: {},
-//     };
-
-//   if (data.role === 'INSTITUTION')
-//     record.merchant = {
-//       create: {},
-//     };
-
-//   // hash bvn
-//   let bvnHash = hashToken(data.bvn);
-//   if (data.role === 'USER') bvnHash = data.bvn; //Hashing will come when user add emails
-//   if (data?.email !== undefined) record.email = data.email;
-
-//   const user = await prisma.$transaction(async (tx) => {
-//     const _user = await tx.user.create({
-//       data: {
-//         bvn: bvnHash,
-//         ...record,
-//       },
-//       include: { address: true },
-//     });
-
-//     await tx.auditLog.create({
-//       data: { userId: _user.id, action: 'REGISTER', ip: null },
-//     });
-
-//     return _user;
-//   });
-
-//   limiter.schedule(() => sendOTP(user));
-
-//   return user;
-// }
 
 export async function register(data: Register) {
   if (data?.email) {
@@ -149,6 +96,9 @@ export async function login(data: Login) {
   const user = await prisma.user.findFirst({
     where: {
       OR: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
+    },
+    include: {
+      wallets: true,
     },
   });
 
@@ -275,7 +225,7 @@ export async function rotateRefreshToken(
     prisma.refreshToken.create({
       data: {
         userId: user.id,
-        tokenHash: newHash,
+        tokenHash: newHash!,
         expiresAt: newExpires,
         deviceInfo,
       },
@@ -300,12 +250,34 @@ export async function logout(refreshTokenRaw?: string, ip?: string) {
   // audit log optional
 }
 
-export async function resendOTP(userId: string) {
+export async function resendOTP(userId: string, data: any) {
   const user = await prisma.user.findFirst({
     where: { id: userId },
   });
 
   if (!user) throw new CustomError('User not found', 500);
+
+  if (data.email && data.type === 'EMAIL') {
+    const _user = await prisma.user.findFirst({
+      where: {
+        email: data.email,
+      },
+    });
+
+    if (_user) throw new CustomError('User exist. Click on forgot pin', 409);
+
+    limiter.schedule(() =>
+      sendOTP(
+        {
+          ...user,
+          email: data.email,
+          name: data?.name ?? '',
+        },
+        data.type,
+      ),
+    );
+    return;
+  }
 
   limiter.schedule(() => sendOTP(user));
 

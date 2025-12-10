@@ -3,7 +3,6 @@ import { Embedly } from '@/extensions/embedly';
 import CustomError from '@/utils/customError';
 import { useErrorParser } from '@/utils';
 import * as webhookService from './service';
-import { prisma } from '@/prisma/client';
 
 export class Controller {
   static async handleTransfers(req: Request, res: Response) {
@@ -20,14 +19,10 @@ export class Controller {
         signature,
       );
 
-      // console.log(isVerified, 'isVerified');
-
       if (!isVerified) throw new CustomError('Invalid signature', 401);
 
       const result = req.body;
       let transfer = undefined;
-
-      console.log(result, 'Result -> Webhook');
 
       if (result.event === 'nip')
         transfer = await webhookService.inflow(result?.data);

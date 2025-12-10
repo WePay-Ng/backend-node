@@ -8,11 +8,10 @@ import {
 import * as WalletService from './service';
 import { useErrorParser } from '@/utils';
 import { prisma } from '@/prisma/client';
-import { createEmbedlyUser, hashBVN } from '../users/service';
+import * as UserService from '../users/service';
 import { Embedly } from '@/extensions/embedly';
 import axios from 'axios';
 import { banks } from '@/extensions/embedly/utils';
-import { tryCatch } from 'bullmq';
 import { environment } from '@/config/env';
 
 export class Controller {
@@ -109,6 +108,7 @@ export class Controller {
       if (!user) throw new CustomError('Unauthorized', 401);
 
       const { error, value } = ValidateCreateWallet().validate(req.body);
+
       if (error) throw new CustomError(error.details[0].message, 422);
 
       // TODO: Rewrite this code to create multiple wallets
@@ -120,46 +120,28 @@ export class Controller {
           data: user.wallets[0],
         });
 
-      if (!user.embedlyCustomerId) {
-        const data = {
-          embedly: {
-            address: user?.address?.streetLine,
-            city: user?.address?.city,
-            country: user?.address?.country,
-            dob: user?.dob,
-            firstName: user?.name?.split(' ')[0],
-            lastName: user?.name?.split(' ')[1],
-            mobileNumber: user?.phone,
-            middleName: user?.name?.split(' ')[2],
-          },
-          email: user?.email!,
-          bvn: user?.bvn!,
-        };
+      const address = await prisma.address.findUnique({
+        where: { id: user.addressId },
+      });
 
-        const wallet = await createEmbedlyUser(user.id, data);
-
-        return res.status(200).json({
-          message: 'Wallet created successfully',
-          success: true,
-          data: wallet,
-        });
-      }
-
-      const verified = await Embedly.customers.verifyKYC({
+      const data = {
+        embedly: {
+          address: address?.streetLine,
+          city: address?.city,
+          country: address?.country,
+          dob: user?.dob,
+          firstName: user?.name?.split(' ')[0],
+          lastName: user?.name?.split(' ')[1],
+          phone: user?.phone,
+          middleName: user?.name?.split(' ')[2],
+          id: user?.embedlyCustomerId,
+        },
+        extra: { currency: value?.currency },
+        email: user?.email!,
         bvn: user?.bvn!,
-        customerId: user?.embedlyCustomerId,
-      });
+      };
 
-      if (!verified) throw new CustomError('User KYC not verified', 422);
-
-      const wallet = await WalletService.createWallet({
-        currency: value?.currency ?? 'NGN',
-        userId: user.id,
-      });
-
-      if (!wallet) throw new CustomError('Failed to create user wallet', 500);
-
-      await hashBVN(user.id, user?.bvn!);
+      const wallet = await UserService.createEmbedlyUser(user.id, data);
 
       return res.status(200).json({
         message: 'Wallet created successfully',
@@ -167,6 +149,7 @@ export class Controller {
         data: wallet,
       });
     } catch (error: any) {
+      console.log(error);
       const e = useErrorParser(error);
       return res.status(e.status).json(e);
     }
@@ -188,23 +171,58 @@ export class Controller {
         success: true,
         data: wallet,
       });
-    } catch (error) {}
+    } catch (error) {
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
+    }
   }
 
   static async getBanks(req: Request, res: Response) {
     try {
-      const resp = await axios.get('https://api.nigerianbanklogos.xyz/');
-      const allBanks = resp.data;
+      const normalizeBankName = (name: string): string => {
+        return (
+          name
+            .toLowerCase()
+            .trim()
+            // Remove common suffixes
+            .replace(
+              /\s+(plc|ltd|limited|bank|holdings?|group|nig(eria)?|microfinance|mfb)$/gi,
+              '',
+            )
+            .replace(/\s+/g, ' ') // normalize whitespace
+            .trim()
+        );
+      };
 
-      const merged = banks
-        .map((bank: any) => {
-          const match = allBanks.find((b: any) =>
-            b.title.toLowerCase().includes(bank.bankName.toLowerCase()),
-          );
-          return match ? { ...bank, ...match } : null;
-        })
-        .filter(Boolean);
-      console.log(merged.length);
+      const resp = await axios.get('https://api.nigerianbanklogos.xyz/');
+
+      const allBanks = resp.data;
+      let i = 0;
+      const merged = banks.map((bank: any) => {
+        const normalizedBankName = normalizeBankName(bank.bankName);
+
+        const match = allBanks.find((b: any) => {
+          const normalizedApiTitle = normalizeBankName(b.title);
+
+          // Exact match after normalization
+          if (normalizedApiTitle === normalizedBankName) return true;
+
+          // Check if one contains the other (for cases like "Access" vs "Access Bank")
+          if (
+            normalizedApiTitle.includes(normalizedBankName) ||
+            normalizedBankName.includes(normalizedApiTitle)
+          ) {
+            return true;
+          }
+
+          return false;
+        });
+
+        // Keep all banks, add logo data if available
+        if (match) i++;
+        return match ? { ...bank, logo: match.route } : bank;
+      });
+      console.log(banks);
       return res.status(200).json({
         message: 'Retrieve all banks',
         success: true,

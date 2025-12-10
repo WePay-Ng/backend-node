@@ -56,13 +56,17 @@ class Customer {
         countryId: country?.id,
         address: sanitizedAddress,
       };
+
+      console.log(data, 'Embedly API Call');
+
       const res = await Client.post('/customers/add', data);
       const { data: result } = res;
 
-      if (result.code !== '00') throw new CustomError(result.message, 500);
+      if (result.code !== '00') return;
 
       return result.data;
     } catch (error) {
+      console.log(error, 'Error Embedly API Call');
       const res = error?.response?.data;
       if (res && !res.success)
         throw new CustomError(
@@ -73,6 +77,16 @@ class Customer {
       const e = useErrorParser(error);
       throw new CustomError(e?.message, e.status);
     }
+  }
+
+  static async get(id: string) {
+    const res = await Client.get('/customers/get/id/' + id);
+    const { data: result } = res;
+
+    if (result?.code !== '00')
+      throw new CustomError('Failed to retrieve Customer from Embedly', 404);
+
+    return result.data;
   }
 
   static async corporate(payload: Corporate) {
@@ -114,10 +128,18 @@ class Customer {
       });
       const { data: result } = res;
 
-      if (result.code !== '00') throw new CustomError(result.message, 500);
+      if (result.code !== '00') return;
       return result.data;
     } catch (error) {
       const res = error?.response?.data;
+      const message = 'Customer has already completed BVN verification!';
+
+      if (res && res.message.includes(message)) {
+        return {
+          success: true,
+        };
+      }
+
       if (res && !res.success)
         throw new CustomError(res.message, res.statusCode);
 
@@ -143,15 +165,14 @@ class Wallet {
   static async create(wallet: iWallet) {
     const currency = currencies.find((c) => c.shortName === wallet.currency);
 
-    const { currency: c, ...rest } = wallet;
+    const { currency: c, userId, ...rest } = wallet;
     const res = await Client.post('/wallets/add', {
       ...rest,
       currencyId: currency?.id,
     });
     const { data: result } = res;
 
-    if (result?.code !== '00')
-      throw new CustomError('Wallet creation failed', 500);
+    if (result?.code !== '00') return;
 
     return result.data;
   }
@@ -160,8 +181,7 @@ class Wallet {
     const res = await Client.get('/wallets/get/wallet/' + id);
     const { data: result } = res;
 
-    if (result?.code !== '00')
-      throw new CustomError('Failed to retrieve Wallet from Embedly', 404);
+    if (result?.code !== '00') return;
 
     return result.data;
   }

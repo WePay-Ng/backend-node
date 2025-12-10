@@ -52,7 +52,7 @@ export const QUEUE_NAMES = {
   CREATEWALLET: 'create_wallet',
 } as const;
 
-export async function sendOTP(user: User) {
+export async function sendOTP(user: User, type = 'PHONE') {
   const code = otpGenerator.generate(6, {
     lowerCaseAlphabets: false,
     upperCaseAlphabets: false,
@@ -63,21 +63,21 @@ export async function sendOTP(user: User) {
     data: {
       refreshCode: code,
       userId: user.id,
-      type: user.phone && !user?.email ? 'PHONE' : 'EMAIL',
+      type: type === 'PHONE' ? 'PHONE' : 'EMAIL',
     },
   });
 
   if (!verification) throw new Error('OTP not saved');
 
   // Send SMS
-  if (user.phone)
+  if (user.phone && type === 'PHONE')
     Akuuk.sendSMS({
       country: user?.country ?? 'NG',
       number: user.phone,
       message: `Your WePay verification code is: ${code}`,
     }).catch((e) => console.log(e));
 
-  if (user.email)
+  if (user.email && type === 'EMAIL')
     sendEmail({
       to: user?.email!,
       variables: {
@@ -225,6 +225,12 @@ function wrapText(text?: string, max = 32) {
   return lines.join('\n');
 }
 
+function shortenDesc(desc?: string, max = 30) {
+  if (!desc) return desc;
+  if (desc.length <= max) return desc;
+  return desc.slice(0, max - 3) + '...';
+}
+
 export function formatTransferSMS({
   account,
   amount,
@@ -245,7 +251,8 @@ export function formatTransferSMS({
   return `
 Acct: ******${account.slice(-4)}
 Amt: ${currency}${formatCurrency(amountInNaira(amount))} ${type}
-Desc: ${wrapText(desc)}
+Desc: ${wrapText(shortenDesc(desc))}
 Avail Bal: ${currency}${formatCurrency(amountInNaira(balance))}
-Date: ${formatDate(date)}`;
+Date: ${formatDate(date)}
+Thanks for using WePay`;
 }
