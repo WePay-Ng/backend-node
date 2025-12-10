@@ -11,11 +11,7 @@ import {
   ValidateRegister,
   ValidateResetPassword,
   ValidateResetPin,
-<<<<<<< HEAD
-  ValidateUpdatePin,
-=======
   ValidateVerifyDOB,
->>>>>>> 96cc4de9b79379261c7ba4daf927edc9723371a8
   VerifyBVN,
 } from './validator';
 import CustomError from '@/utils/customError';
