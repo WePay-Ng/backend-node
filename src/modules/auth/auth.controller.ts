@@ -11,6 +11,7 @@ import {
   ValidateRegister,
   ValidateResetPassword,
   ValidateResetPin,
+  ValidateUpdatePin,
   ValidateVerifyDOB,
   VerifyBVN,
 } from './validator';
@@ -19,6 +20,7 @@ import { isDev, useErrorParser } from '@/utils';
 import { getUser } from '@/utils/getUser';
 import Bottleneck from 'bottleneck';
 import { signAccessToken } from '@/utils/jwt';
+import { User } from '@prisma/client';
 
 const limiter = new Bottleneck({
   maxConcurrent: 1,
@@ -32,7 +34,7 @@ export class AuthController {
       if (error) throw new CustomError(error.details[0].message, 422);
 
       const exist = await userService.validateBVN(value.bvn);
-      if (exist) throw new Error('BVN already in use');
+      if (exist) throw new CustomError('BVN already in use', 403);
 
       const payload = await userService.getBVNData(value);
 
@@ -205,9 +207,6 @@ export class AuthController {
 
   static async resetPin(req: Request, res: Response) {
     try {
-      const user = req?.user;
-      if (!user) throw new CustomError('Unauthorized', 402);
-
       const { error, value } = ValidateResetPin().validate(req.body);
       if (error) throw new CustomError(error.details[0].message, 422);
 
@@ -230,6 +229,12 @@ export class AuthController {
         throw new CustomError('Invalid or expired OTP', 422);
       }
 
+      const user: User | null = await prisma.user.findFirst({
+        where: { id: otpRecord.userId },
+      });
+
+      if (!user) throw new CustomError('User not found', 404);
+
       // 3️⃣ Reset PIN
       const data = await authService.resetPin(user, { pin });
 
@@ -244,87 +249,59 @@ export class AuthController {
     }
   }
 
-  static async verifyOTP(req: Request, res: Response) {
+  static async updatePin(req: Request, res: Response) {
     try {
-      const { code, dob } = req.body;
-      const id = req.params.id;
+      const user = req?.user;
+      if (!user) throw new CustomError('Unauthorized', 402);
 
-      if (!code && !dob) {
-        throw new CustomError(
-          'Either OTP code or date of birth is required',
-          422,
-        );
-      }
+      const { error, value } = ValidateUpdatePin().validate(req.body);
+      if (error) throw new CustomError(error.details[0].message, 422);
 
-      let verified = false; // track if user passed verification
+      const { pin } = value;
 
-      // ---------------------------
-      // 1️⃣ OTP VERIFICATION (if code provided)
-      // ---------------------------
-      if (code) {
-        const record: Record<string, unknown> = {};
-
-        if (!isDev() && code !== '222222') {
-          record.refreshCode = code;
-        }
-
-        const verification = await prisma.verificationIntent.findFirst({
-          where: { userId: id, ...record },
-        });
-
-        if (!verification) throw new CustomError('Invalid OTP', 422);
-
-        // OTP matched → delete all OTPs
-        limiter.schedule(() =>
-          prisma.verificationIntent.deleteMany({
-            where: { userId: id },
-          }),
-        );
-
-        verified = true;
-      }
-
-      // ---------------------------
-      // 2️⃣ DOB VERIFICATION (if no OTP or fallback)
-      // ---------------------------
-      if (!verified) {
-        const userRecord = await prisma.user.findUnique({ where: { id } });
-        if (!userRecord) throw new CustomError('User not found', 404);
-
-        if (!userRecord.dob)
-          throw new CustomError(
-            'User does not have a registered date of birth',
-            400,
-          );
-
-        // Normalize both dates to YYYY-MM-DD
-        const formatDate = (v: string | Date) =>
-          new Date(v).toISOString().split('T')[0];
-
-        const dbDob = formatDate(userRecord.dob);
-        const inputDob = formatDate(dob);
-
-        if (dbDob !== inputDob) {
-          throw new CustomError('Date of birth does not match', 422);
-        }
-
-        verified = true;
-      }
-
-      // Should never fail here, but safety check
-      if (!verified) {
-        throw new CustomError('Verification failed', 500);
-      }
-
-      // ---------------------------
-      // 3️⃣ Mark user as verified
-      // ---------------------------
-      const updatedUser = await userService.update(id, { emailVerified: true });
+      // 3️⃣ Reset PIN
+      const data = await authService.resetPin(user, { pin });
 
       return res.status(200).json({
-        message: 'Verify Successful',
+        message: 'PIN updatedd successfully',
         success: true,
-        data: await getUser(updatedUser),
+        data,
+      });
+    } catch (error: any) {
+      const e = useErrorParser(error);
+      return res.status(e.status).json(e);
+    }
+  }
+
+  static async verifyOTP(req: Request, res: Response) {
+    try {
+      // Flaw: A user can use another user code to verify except userID is passed
+
+      const code = req.body?.code;
+      const id = req.params.id;
+
+      const record: Record<string, unknown> = {};
+      if (!isDev() && code !== '222222') record.refreshCode = code;
+
+      const verification = await prisma.verificationIntent.findFirst({
+        where: { userId: id, ...record },
+      });
+
+      if (!verification) throw new CustomError('Invalid OTP', 422);
+
+      // Delete all user OTP
+      limiter.schedule(() =>
+        prisma.verificationIntent.deleteMany({
+          where: { userId: verification.userId },
+        }),
+      );
+
+      const user = await userService.update(id, { emailVerified: true });
+
+      return res.status(200).json({
+        msg: 'Verify Successful',
+        data: await getUser(user),
+        success: true,
       });
     } catch (error) {
       const e = useErrorParser(error);

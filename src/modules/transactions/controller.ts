@@ -16,6 +16,7 @@ export class Controller {
 
       const transactions = await prisma.transaction.findMany({
         where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
         take: size,
         skip: page,
       });
