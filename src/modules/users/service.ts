@@ -328,33 +328,37 @@ export async function createEmbedlyUser(userId: string, data: EmbedlyInput) {
 }
 
 export async function getBVNData(value: BVNInput) {
-  const data = await Youverify.verifyBVN({
-    id: value.bvn,
-    isSubjectConsent: true,
-    premiumBVN: true,
-  });
+  try {
+    const data = await Youverify.verifyBVN({
+      id: value.bvn,
+      isSubjectConsent: true,
+      premiumBVN: true,
+    });
 
-  return {
-    ...value,
-    extra: {
-      name: data?.firstName + ' ' + data?.lastName,
-      dob: toISODate(data?.dateOfBirth),
-      country: data?.country,
-      gender: data?.gender,
-      phone: data?.mobile,
-    },
-    embedly: {
-      dob: toISODate(data?.dateOfBirth),
-      country: data?.country,
-      gender: data?.gender,
-      phone: data?.mobile,
-      address: data?.address?.addressLine,
-      city: data?.address?.town,
-      firstName: data?.firstName,
-      lastName: data?.lastName,
-      middleName: data?.middleName,
-    },
-  };
+    return {
+      ...value,
+      extra: {
+        name: data?.firstName + ' ' + data?.lastName,
+        dob: toISODate(data?.dateOfBirth),
+        country: data?.country,
+        gender: data?.gender,
+        phone: data?.mobile,
+      },
+      embedly: {
+        dob: toISODate(data?.dateOfBirth),
+        country: data?.country,
+        gender: data?.gender,
+        phone: data?.mobile,
+        address: data?.address?.addressLine,
+        city: data?.address?.town,
+        firstName: data?.firstName,
+        lastName: data?.lastName,
+        middleName: data?.middleName,
+      },
+    };
+  } catch (error) {
+    throw error;
+  }
 }
 
 export async function captureFingerPrint(
