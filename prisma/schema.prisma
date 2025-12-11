@@ -319,6 +319,7 @@ model Transfer {
   metadata             Json?
   completedAt          DateTime?
   type                 TransferType   @default(INTERNAL)
+  kind                 TransferKind   @default(OUT)
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @default(now()) @updatedAt
   ledgerEntries        Ledger[]       @relation("TransferLedger")
@@ -435,6 +436,11 @@ enum UserRole {
 enum TransferType {
   INTERNAL
   EXTERNAL
+}
+
+enum TransferKind {
+  OUT
+  IN
 }
 
 enum AirtimeStatus {

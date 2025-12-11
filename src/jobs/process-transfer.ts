@@ -237,7 +237,7 @@ export async function processTransferEvent(eventId: any) {
       await tx.transaction.create({
         data: {
           status: 'PROCESSING',
-          amount: Number(feeRate),
+          amount: Number(TXNFEE),
           itemId: fee.id,
           type: 'FEE',
           userId: payload.initiatedBy,

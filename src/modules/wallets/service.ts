@@ -79,6 +79,7 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
         currency,
         initiatedBy: initiatorUserId,
         reason,
+        kind: 'OUT',
         status: 'PENDING',
         shouldRefund: true,
         type: 'EXTERNAL',
@@ -91,7 +92,7 @@ export async function transferToExternalBank(payload: ExternalTransferInput) {
     // Create a transaction
     await tx.transaction.create({
       data: {
-        amount: -amt.toString(),
+        amount: -amount.toString(),
         itemId: transfer.id,
         type: 'TRANSFER',
         status: 'PENDING',
@@ -257,6 +258,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
         toWalletId: toWallet.id,
         amount: amt,
         currency,
+        kind: 'OUT',
         initiatedBy: initiatorUserId,
         reason,
         status: 'PENDING',
@@ -393,7 +395,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
       },
     });
 
-    // Create a transaction
+    // Create a debit transaction
     await tx.transaction.create({
       data: {
         amount: -amount.toString(),
@@ -413,7 +415,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
       },
     });
 
-    // Create a transaction
+    // Create a credit transaction
     await tx.transaction.create({
       data: {
         amount: amount,

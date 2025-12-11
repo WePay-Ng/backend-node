@@ -8,6 +8,7 @@ const TXNFEE = process.env.EXTERNAL_PERCENT ?? 15;
 
 export async function payout(payload: any) {
   try {
+    console.log(payload);
     if (payload?.status?.toLowerCase() !== 'success')
       throw new CustomError('Error from Embedly', 500);
 
@@ -282,6 +283,7 @@ export async function inflow(payload: any) {
         amount: amountInKobo(Number(payload.amount)),
         currency: 'NGN',
         type: 'EXTERNAL',
+        kind: 'IN',
         idempotencyKey: payload?.reference,
         transactionReference: payload?.reference,
         reason: payload.description,

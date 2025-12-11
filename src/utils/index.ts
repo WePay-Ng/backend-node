@@ -190,16 +190,16 @@ export async function checkDailyLimit(
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const totalTransferredToday = await prisma.transfer.aggregate({
-    _sum: { amount: true },
+  const result = await prisma.ledger.aggregate({
+    _sum: { change: true },
     where: {
-      fromWalletId: fromWallet.id,
+      walletId: fromWallet.id,
       createdAt: { gte: todayStart },
-      status: { in: ['PENDING', 'COMPLETED'] },
+      type: 'TRANSFER_DEBIT',
     },
   });
 
-  const transferred = BigInt(totalTransferredToday._sum.amount || 0);
+  const transferred = result._sum.change ? -result._sum.change : 0n;
 
   const tier = fromUser.currentTier as keyof typeof DAILY_LIMITS;
   const dailyLimit = DAILY_LIMITS[tier] || DAILY_LIMITS.TIER_1;
