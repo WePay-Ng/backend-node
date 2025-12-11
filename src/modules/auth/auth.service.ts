@@ -7,9 +7,8 @@ import { addDays } from 'date-fns';
 import { Login, Register, ResetPassword } from '../../types/types';
 import { User } from '@prisma/client';
 import Bottleneck from 'bottleneck';
-import { sendOTP } from '@/utils';
+import { sendOTP, generateUserSafeId } from '@/utils';
 import CustomError from '@/utils/customError';
-import { generateUserSafeId } from '@/utils/uniqueIdGenerator';
 
 const limiter = new Bottleneck({
   maxConcurrent: 1,
@@ -165,7 +164,7 @@ export async function forgotPassword(data: { email: string; ip?: string }) {
 export async function resetPassword(data: ResetPassword) {
   const { token, newPassword, ip } = data;
   const verificationIntent = await prisma.verificationIntent.findFirst({
-    where: { refreshCode: token }
+    where: { refreshCode: token },
   });
   if (!verificationIntent) throw new Error('Invalid or expired token');
 

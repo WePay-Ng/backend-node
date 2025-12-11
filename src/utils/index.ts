@@ -6,6 +6,7 @@ import otpGenerator from 'otp-generator';
 import sendEmail from '@/extensions/mail-service/send-email';
 import { Akuuk } from '@/extensions/akuuk';
 import { environment } from '@/config/env';
+import crypto from 'crypto';
 
 export function fileDirName(meta: any) {
   const __filename = fileURLToPath(meta.url);
@@ -255,4 +256,10 @@ Desc: ${wrapText(shortenDesc(desc))}
 Avail Bal: ${currency}${formatCurrency(amountInNaira(balance))}
 Date: ${formatDate(date)}
 Thanks for using WePay`;
+}
+
+export function generateUserSafeId(): string {
+  const input = `${Date.now() - Math.random()}`;
+  const hash = crypto.createHash('sha256').update(input).digest('hex');
+  return hash.substring(0, 8).toUpperCase();
 }
