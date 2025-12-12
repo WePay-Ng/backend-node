@@ -7,7 +7,7 @@ import { addDays } from 'date-fns';
 import { Login, Register, ResetPassword } from '../../types/types';
 import { User } from '@prisma/client';
 import Bottleneck from 'bottleneck';
-import { sendOTP, generateUserSafeId } from '@/utils';
+import { sendOTP, generateUserSafeId, amountInNaira } from '@/utils';
 import CustomError from '@/utils/customError';
 
 const limiter = new Bottleneck({
@@ -121,7 +121,15 @@ export async function login(data: Login) {
     data: { userId: user.id, action: 'LOGIN' },
   });
 
-  return user;
+  return {
+    ...user,
+    wallets: user.wallets.map((w) => ({
+      ...w,
+      availableBalance: amountInNaira(w.availableBalance),
+      ledgerBalance: amountInNaira(w.ledgerBalance),
+      reservedBalance: amountInNaira(w.reservedBalance),
+    })),
+  };
 }
 
 export async function loginWithFinger(data: { fingerPrint: string }) {

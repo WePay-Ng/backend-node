@@ -251,7 +251,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
 
     // create Transfer record
     const operationId = `transfer_${payload.idempotencyKey}`;
-    const transfer = await tx.transfer.create({
+    let transfer = await tx.transfer.create({
       data: {
         idempotencyKey,
         fromWalletId: fromWallet.id,
@@ -363,7 +363,7 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
     });
 
     // mark transfer completed
-    await tx.transfer.update({
+    transfer = await tx.transfer.update({
       where: { id: transfer.id },
       data: {
         status: 'COMPLETED' as any,
@@ -435,23 +435,6 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
       },
     });
 
-    // TODO: This not working
-    const message = formatTransferSMS({
-      account: fromWallet.accountNumber,
-      amount: amt,
-      currency,
-      desc: reason?.toUpperCase(),
-      balance: newFromAvailable,
-      date: new Date(),
-      type: 'DR',
-    });
-    await Queue.trigger(transfer.id, 'NOTIFICATION', {
-      country: fromUser?.country ?? 'NG',
-      message,
-      phone: fromUser?.phone!,
-      type: 'SMS',
-    });
-
     // return structured result
     return {
       transfer: {
@@ -466,7 +449,26 @@ export async function walletToWalletTransfer(payload: TransferPayload) {
     };
   });
 
-  const newToAvailable = BigInt(toWallet.availableBalance as any) + amt;
+  const newFromAvailable = BigInt(fromWallet?.availableBalance as any) - amt;
+  const newToAvailable = BigInt(toWallet?.availableBalance as any) + amt;
+
+  // TODO: This not working
+  const DRMessage = formatTransferSMS({
+    account: fromWallet.accountNumber,
+    amount: amt,
+    currency,
+    desc: reason?.toUpperCase(),
+    balance: newFromAvailable,
+    date: new Date(),
+    type: 'DR',
+  });
+
+  await Queue.trigger(transfer.id, 'NOTIFICATION', {
+    country: fromUser?.country ?? 'NG',
+    message: DRMessage,
+    phone: fromUser?.phone!,
+    type: 'SMS',
+  });
 
   const message = formatTransferSMS({
     account: toWallet.accountNumber,

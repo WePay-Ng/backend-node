@@ -199,12 +199,15 @@ export async function checkDailyLimit(
     },
   });
 
-  const transferred = result._sum.change ? -result._sum.change : 0n;
+  const amount = amountInNaira(amt);
+  const transferred = amountInNaira(
+    result._sum.change ? -result._sum.change : 0n,
+  );
 
   const tier = fromUser.currentTier as keyof typeof DAILY_LIMITS;
   const dailyLimit = DAILY_LIMITS[tier] || DAILY_LIMITS.TIER_1;
 
-  return transferred + amt > dailyLimit;
+  return BigInt(transferred + amount) > dailyLimit;
 }
 
 function wrapText(text?: string, max = 32) {
